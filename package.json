@@ -1,0 +1,49 @@
+{
+  "name": "pixel-toon-studio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "start": "node server/static.mjs",
+    "verify:model": "node scripts/verify-model.mjs",
+    "build": "npm run verify:model && tsc -b && vite build && node scripts/write-offline-manifest.mjs",
+    "test:browser": "node scripts/qa-editor.mjs",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:models": "vitest run tests/local-v2.test.ts tests/local-v2-model.test.ts",
+    "desktop:start": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --mac --arm64 --dir",
+    "desktop:dmg": "npm run build && electron-builder --mac dmg --arm64",
+    "desktop:assets": "node scripts/create-desktop-assets.mjs",
+    "test:desktop": "node scripts/qa-desktop.mjs",
+    "test:desktop-open": "node scripts/qa-desktop-open-images.mjs",
+    "test:editor": "node scripts/qa-editor.mjs"
+  },
+  "dependencies": {
+    "heic-to": "1.6.7",
+    "onnxruntime-web": "1.24.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.21",
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0",
+    "fake-indexeddb": "6.2.4",
+    "playwright": "1.58.2",
+    "postcss": "^8.5.6",
+    "protobufjs": "7.6.6",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "6.4.5",
+    "vitest": "4.1.12"
+  },
+  "description": "本机照片清晰化与艺术风格编辑器",
+  "author": "Pixel & Toon Studio",
+  "main": "desktop/main.mjs"
+}

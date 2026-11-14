@@ -1,0 +1,81 @@
+import { analyzeAutoColor, type AutoColorPlan } from '../imaging/autoColor';
+import { decode, toImageData, imageDataCanvas } from '../imaging/decode';
+import { getResult } from '../storage/enhancementStore';
+import type { PhotoTab, EditorSnapshot } from '../types/document';
+
+export function canvasBlob(canvas: HTMLCanvasElement, type = 'image/png', quality?: number) {
+    return new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片编码失败，可能是内存不足')), type, quality));
+}
+export async function resolveBase(tab: PhotoTab, state: EditorSnapshot) {
+    const selection = state.enhancement;
+    if (!selection?.enabled || !selection.resultId || selection.strength === 0) return { blob: tab.blob, width: tab.width, height: tab.height };
+    const result = await getResult(selection.resultId);
+    if (!result) throw new Error('增强缓存已被清理，请关闭增强使用原图，或手动重新生成');
+    return { blob: result.blob, width: result.width, height: result.height };
+}
+// Shared by preview and full-resolution export. Strength never starts a model task.
+const previewPairs = new Map<string, Promise<{ original: ImageData; enhanced: ImageData }>>();
+export async function basePixels(tab: PhotoTab, state: EditorSnapshot, maxSide: number): Promise<ImageData> {
+    const selection = state.enhancement;
+    if (Number.isFinite(maxSide) && selection?.enabled && selection.resultId && selection.strength > 0) {
+        const key = `${tab.id}:${selection.resultId}:${maxSide}`;
+        if (!previewPairs.has(key)) {
+            const promise = (async () => {
+                const enhanced = await uncachedBasePixels(tab, { ...state, enhancement: { ...selection, strength: 100 } }, maxSide);
+                const bitmap = await decode(tab.blob), canvas = document.createElement('canvas');
+                canvas.width = enhanced.width; canvas.height = enhanced.height;
+                try {
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+                    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                    return { enhanced, original: ctx.getImageData(0, 0, canvas.width, canvas.height) };
+                } finally { bitmap.close(); canvas.width = 1; }
+            })();
+            previewPairs.set(key, promise);
+            promise.catch(() => previewPairs.delete(key));
+            while (previewPairs.size > 3) previewPairs.delete(previewPairs.keys().next().value!);
+        }
+        const pair = await previewPairs.get(key)!;
+        const amount = selection.strength / 100, pixels = new ImageData(new Uint8ClampedArray(pair.enhanced.data), pair.enhanced.width, pair.enhanced.height);
+        if (amount < 1) for (let i = 0; i < pixels.data.length; i += 4) for (let c = 0; c < 3; c++) pixels.data[i + c] = pair.original.data[i + c] * (1 - amount) + pair.enhanced.data[i + c] * amount;
+        return pixels;
+    }
+    return uncachedBasePixels(tab, state, maxSide);
+}
+async function uncachedBasePixels(tab: PhotoTab, state: EditorSnapshot, maxSide: number) {
+    const base = await resolveBase(tab, state), enhanced = await decode(base.blob);
+    let pixels: ImageData;
+    try { pixels = toImageData(enhanced, maxSide); } finally { enhanced.close(); }
+    if (!state.enhancement?.enabled || !state.enhancement.resultId || state.enhancement.strength === 0 || state.enhancement.strength === 100) return pixels;
+    const original = await decode(tab.blob), canvas = document.createElement('canvas');
+    canvas.width = pixels.width; canvas.height = pixels.height;
+    try {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(original, 0, 0, canvas.width, canvas.height);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height), amount = state.enhancement.strength / 100;
+        for (let i = 0; i < data.data.length; i += 4) for (let c = 0; c < 3; c++) pixels.data[i + c] = data.data[i + c] * (1 - amount) + pixels.data[i + c] * amount;
+        return pixels;
+    } finally { original.close(); canvas.width = 1; }
+}
+export async function exportBase(tab: PhotoTab, state: EditorSnapshot) {
+    const base = await resolveBase(tab, state);
+    if (!state.enhancement?.enabled || state.enhancement.strength === 0 || state.enhancement.strength === 100) return base;
+    const canvas = imageDataCanvas(await basePixels(tab, state, Infinity));
+    try { return { ...base, blob: await canvasBlob(canvas) }; } finally { canvas.width = 1; }
+}
+
+const colorPlans = new Map<string, Promise<AutoColorPlan>>();
+
+// Always analyze the same whole-photo sample, never individual export tiles.
+export async function autoColorPlan(tab: PhotoTab, state: EditorSnapshot) {
+    if (!state.autoColor?.enabled || state.autoColor.strength === 0) return null;
+    const version = state.autoColor.algorithmVersion === 2 ? 2 : 1;
+    const key = JSON.stringify([tab.id, state.enhancement, version]);
+    let plan = colorPlans.get(key);
+    if (!plan) {
+        plan = basePixels(tab, state, 384).then(sample => analyzeAutoColor(sample.data, 100, version));
+        colorPlans.set(key, plan);
+        plan.catch(() => { if (colorPlans.get(key) === plan) colorPlans.delete(key); });
+        while (colorPlans.size > 8) colorPlans.delete(colorPlans.keys().next().value!);
+    }
+    return { ...await plan, strength: state.autoColor.strength / 100 };
+}

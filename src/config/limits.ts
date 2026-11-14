@@ -1,0 +1,10 @@
+export const MAX_PIXELS = 24000000;
+export const MAX_SIDE = 12000;
+export const PREVIEW_SIDE = 1600;
+export const EXPORT_TILE = 768;
+export const EXPORT_HALO = 96;
+export const WATERCOLOR_STYLE_SIDE = 768;
+export const WATERCOLOR_DIRECTION_BINS = 16;
+export const PENCIL_STYLE_SIDE = 960;
+export const PAPER_SEED = 0x51f15e;
+export const GRAIN_SEED = 0x749a21;

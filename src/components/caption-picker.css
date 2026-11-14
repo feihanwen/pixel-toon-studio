@@ -1,0 +1,26 @@
+.caption-box .choose-caption { display: block; width: 100%; margin-top: 12px; padding: 10px; border: 1px solid var(--accent-border); border-radius: 20px; color: var(--accent); background: var(--accent-soft); text-align: center; font-weight: 550; }
+.caption-box .choose-caption:hover { background: var(--glass-hover); }
+.caption-dialog { width: min(760px, calc(100vw - 40px)); max-height: min(88dvh, 820px); display: flex; flex-direction: column; background: var(--glass-solid); border: 1px solid var(--glass-border); border-radius: 28px; box-shadow: var(--floating-shadow); color: var(--text); overflow: hidden; }
+.caption-dialog-heading { padding: 26px 26px 16px; display: flex; align-items: flex-start; justify-content: space-between; }
+.caption-dialog-heading h2 { margin: 7px 0; font-size: 23px; font-weight: 600; letter-spacing: -.5px; }
+.caption-dialog-heading p { margin: 0; color: var(--secondary); font-size: 12px; }
+.caption-close { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 24px; color: var(--secondary); background: var(--glass); border: 1px solid var(--glass-border); line-height: 1; }
+.caption-filters { display: flex; gap: 7px; flex-wrap: wrap; padding: 6px 26px; }
+.caption-filters.themes { padding-bottom: 18px; border-bottom: 1px solid var(--divider); }
+.caption-filters button { border: 1px solid var(--glass-border); background: var(--glass); color: var(--secondary); border-radius: 20px; padding: 8px 12px; font-size: 11px; }
+.caption-filters button[aria-pressed=true] { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
+.caption-list { padding: 18px 26px; overflow-y: auto; min-height: 100px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-content: start; }
+.caption-list button { min-height: 78px; text-align: left; border: 1px solid var(--glass-border); border-radius: 17px; background: var(--glass); color: var(--text); padding: 13px 15px; display: flex; flex-direction: column; justify-content: space-between; gap: 9px; }
+.caption-list button:hover { background: var(--glass-hover); }
+.caption-list button.selected { border-color: var(--accent-border); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-border); }
+.caption-list button span { font-size: 13px; line-height: 1.5; }
+.caption-list button small { color: var(--muted); font-size: 10px; }
+.caption-dialog-footer { border-top: 1px solid var(--divider); padding: 16px 26px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.caption-selected { font-size: 11px; color: var(--secondary); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.caption-dialog-footer > div:last-child { display: flex; gap: 8px; }
+.caption-dialog-footer button { border: 1px solid var(--glass-border); background: var(--glass); color: var(--text); border-radius: 20px; padding: 10px 14px; font-size: 11px; white-space: nowrap; }
+.caption-dialog-footer .caption-random { border-color: var(--accent-border); color: var(--accent); }
+.caption-dialog-footer .caption-confirm { border-color: transparent; background: var(--accent); color: var(--accent-text); font-weight: 600; }
+@media (max-width: 760px) {
+  .caption-dialog { width: 100%; max-height: 90dvh; border-radius: 25px; }.caption-dialog-heading { padding: 22px 20px 15px; }.caption-dialog-heading p { font-size: 11px; }.caption-filters { padding-left: 20px; padding-right: 20px; }.caption-filters button { min-height: 40px; }.caption-list { padding: 16px 20px; grid-template-columns: 1fr; }.caption-dialog-footer { padding: 16px 20px 20px; align-items: stretch; flex-direction: column; gap: 12px; }.caption-selected { max-width: none; }.caption-dialog-footer > div:last-child { justify-content: flex-end; }.caption-dialog-footer button { min-height: 44px; }.caption-close { min-width: 40px; min-height: 40px; }
+}

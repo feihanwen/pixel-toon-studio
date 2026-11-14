@@ -1,0 +1,31 @@
+{
+  "id": "liveaction-span-x2",
+  "version": "1.0.0",
+  "file": "model.onnx",
+  "sha256": "bfa72f3c6347076aed140d0836cee30c27ea434c047beeaf9466469483836ecc",
+  "bytes": 1654748,
+  "parameters": 410700,
+  "scale": 2,
+  "outputScale": 2,
+  "tileSize": 128,
+  "overlap": 48,
+  "blend": 8,
+  "layout": "NCHW",
+  "channels": "RGB",
+  "license": "Apache-2.0",
+  "operators": [
+    "Add",
+    "Clip",
+    "Concat",
+    "Constant",
+    "Conv",
+    "DepthToSpace",
+    "Mul",
+    "Sigmoid",
+    "Sub"
+  ],
+  "inputName": "input",
+  "outputName": "output",
+  "sourceUrl": "https://github.com/jcj83429/upscaling/raw/f73a3a02874360ec6ced18f8bdd8e43b5d7bba57/2xLiveActionV1_SPAN/2xLiveActionV1_SPAN_490000.onnx",
+  "author": "jcj83429"
+}

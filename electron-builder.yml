@@ -1,0 +1,51 @@
+appId: studio.pixeltoon.desktop
+electronDist: node_modules/electron/dist
+productName: Pixel & Toon Studio
+artifactName: Pixel-Toon-Studio-${version}-${arch}.${ext}
+directories:
+  output: release
+  buildResources: desktop/assets
+files:
+  - dist/**/*
+  - desktop/*.mjs
+  - desktop/preload.cjs
+  - desktop/THIRD_PARTY_NOTICES.md
+  - package.json
+  - '!node_modules/**/*'
+asar: true
+mac:
+  category: public.app-category.photography
+  target:
+    - target: dmg
+      arch: arm64
+  icon: desktop/assets/icon.icns
+  identity: '-'
+  notarize: false
+  hardenedRuntime: true
+  darkModeSupport: true
+  minimumSystemVersion: 13.0.0
+  fileAssociations:
+    - ext: [png, jpg, jpeg, webp, heic, heif]
+      name: 可编辑照片
+      role: Editor
+      rank: Alternate
+  extendInfo:
+    CFBundleDisplayName: Pixel & Toon Studio
+    NSHumanReadableCopyright: Pixel & Toon Studio
+dmg:
+  title: Pixel & Toon Studio
+  background: desktop/assets/dmg-background.png
+  window:
+    width: 660
+    height: 420
+  iconSize: 100
+  iconTextSize: 13
+  contents:
+    - x: 170
+      y: 190
+      type: file
+    - x: 490
+      y: 190
+      type: link
+      path: /Applications
+npmRebuild: false
