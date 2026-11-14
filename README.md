@@ -1,90 +1,99 @@
-# Pixel & Toon Studio · v1.0
+<div align="center">
+  <img src="desktop/assets/icon.png" width="104" alt="Pixel & Toon Studio 图标">
+  <h1>Pixel & Toon Studio</h1>
+  <p><strong>把喜欢的照片，变成另一种风格。</strong></p>
+  <p>八种艺术风格 · 本机照片增强 · 拍立得相框 · 高清 PNG 导出</p>
+  <p>Mac 桌面 / 网页 &nbsp; · &nbsp; 照片不上传 &nbsp; · &nbsp; 无需账号或 API Key</p>
+  <p>
+    <a href="https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest"><strong>下载 Mac 版 ↗</strong></a>
+    &nbsp; / &nbsp;
+    <a href="#八种风格一张照片的八种表达">效果画廊</a>
+    &nbsp; / &nbsp;
+    <a href="#从导入到成品">功能一览</a>
+    &nbsp; / &nbsp;
+    <a href="docs/DEVELOPMENT.md">开发说明</a>
+  </p>
+</div>
 
-本机照片清晰化与艺术风格编辑器。支持 HEIC / HEIF、PNG、JPEG、WebP 导入、八种艺术风格、智能调色、拍立得相框、原图对比、撤销重做、工作区恢复和高清 PNG 导出。照片和模型均在本机处理，无需账号或 API Key。
+![Pixel & Toon Studio 实际界面：水彩油画风格、左右对比、多照片标签与八种风格选择](docs/showcase/editor.jpg)
 
-版本号统一为 **1.0.0**，Git 标签为 **v1.0**，作为后续开发的新起点。
+选一张照片，试试不同风格，再把光色、笔触和相框调到喜欢的样子。人像、宠物、旅行随拍，都可以在一个工作区里慢慢编辑；随时拖动分割线，看清原图与处理效果的变化。
 
-## Mac 安装
+## 八种风格，一张照片的八种表达
 
-打开 `release/Pixel-Toon-Studio-1.0.0-arm64.dmg`，将软件拖入「应用程序」。支持 Apple Silicon、macOS 13 及更新版本，运行不需要 Node.js 或网络。
+同一张原图，使用当前 v1.0 的默认参数实际导出。风格选好后，还能继续调整墨线、色块、笔触、网点、颗粒和配色。
 
-Finder 中右键照片，选择「打开方式 → Pixel & Toon Studio」，或将照片拖到 Dock 图标即可编辑。工作区保存在 `~/Library/Application Support/Pixel & Toon Studio/`，升级时保留；网页工作区与桌面工作区相互独立。
+![八种真实输出：赛璐璐、像素线条、水彩油画、美漫波普、黑白日漫、彩铅手绘、双色海报与复古胶片](docs/showcase/styles.jpg)
 
-安装包使用 ad-hoc 签名，尚未进行 Apple 公证。下载后若被 macOS 拦截，可到「系统设置 → 隐私与安全性」选择「仍要打开」。
+| 风格 | 画面特点 | 可调细节 |
+| :--- | :--- | :--- |
+| **赛璐璐** | 动漫感色块与清晰轮廓 | 色阶、墨线、边缘、背景保护 |
+| **像素线条** | 像素颗粒与插画线条 | 像素尺寸、细节过滤、色块数量 |
+| **水彩油画** | 柔和的颜料融合与绘画笔触 | 笔触尺寸、画意强度、细节保留 |
+| **美漫波普** | 漫画分色、细腻网点与墨线 | 网点大小与强度、色块、RGB 错位 |
+| **黑白日漫** | 黑白墨线、网点阴影与留白 | 阴影层次、墨线、留白保护 |
+| **彩铅手绘** | 彩铅线稿与纸面纹理 | 笔触、线稿、颜料浓度、纸张质感 |
+| **双色海报** | 两种主色构成的海报感 | 暗部与亮部色相、分色位置、层次 |
+| **复古胶片** | 温暖褪色、胶片颗粒与高光晕染 | 褪色、颗粒、色温、光晕 |
 
-## 网页启动
+### 人像：从照片到动漫与日漫
 
-需要 Node.js 20 或更新版本。当前 `dist/` 为与桌面版同源构建的 v1.0 网页版本：
+左侧保留原图，中间是赛璐璐，右侧是黑白日漫。可以先看整体气质，再调整轮廓、明暗和阴影层次。
 
-```sh
-npm start
-```
+![同一张人像的原图、赛璐璐和黑白日漫效果对比](docs/showcase/portrait.jpg)
 
-打开 http://127.0.0.1:8787 。首次取得代码时，先执行：
+### 宠物：彩铅的柔软，胶片的温暖
 
-```sh
-npm ci
-npm run build
-npm start
-```
+同一张猫咪照片，分别尝试彩铅手绘与复古胶片。风格转换保留原有构图，不需要输入提示词。
 
-生产服务器只提供本机静态文件。`HOST` / `PORT` 可调整监听地址；模型与运行时随构建提供。浏览器首次加载并缓存相应资源后可以离线使用。清理站点数据会清空网页工作区，成品请导出 PNG 保存。
+![猫咪原图与彩铅手绘、复古胶片实际效果对比](docs/showcase/pets.jpg)
 
-## 后续开发
+## 照片增强，先整理底图的细节
 
-```sh
-npm ci
-npm run dev           # 网页开发入口
-npm run desktop:start # 构建并启动桌面开发版
-npm run build         # 更新 dist/ 网页版本
-npm run desktop:dmg   # 生成 release/ 下的 Mac 安装包
-```
+**纹理清晰 / LiveAction ×2** 用于照片放大与纹理增强；**颗粒降噪 / FFDNet** 用于减少噪点，再放大到两倍尺寸。两种方式独立选择，可以直接下载增强底图，也可以接着叠加艺术风格。
 
-`npm run desktop:pack` 只生成 `.app`，用于调试。图标和安装背景已放入源码；修改后可用 `npm run desktop:assets` 重新生成，需要 Chrome 和 macOS 图像工具。
+![225×150 猫咪输入与 LiveAction 实际生成的 450×300 增强结果](docs/showcase/enhancement.jpg)
 
-每次发布时统一更新 `package.json` 与 `package-lock.json` 的应用版本，重新构建网页和安装包，`release/` 保留当前版本 DMG、SHA-256 和本机桌面应用 `mac-arm64/Pixel & Toon Studio.app`。
+> 上例为实际模型输出，未叠加艺术滤镜。两侧按相同显示尺寸展示，左侧低分辨率输入采用最近邻放大。处理效果随照片而变，小模型对严重失焦、运动模糊及缺失细节的恢复能力有限。
 
-## 目录
+增强强度可以调整；不满意可以关闭、撤销或重新生成。**智能调色**也能独立开启，用来优化明暗、白平衡与色彩，再用亮度、对比度和饱和度做最后微调。
 
-| 目录 | 用途 |
-| --- | --- |
-| `src/` | React 编辑器、图片算法、本机模型推理与工作区存储 |
-| `desktop/` | Electron 窗口、文件打开、保存、菜单、图标与许可声明 |
-| `public/` | 两个正式 ONNX 模型、离线支持及第三方许可证 |
-| `server/` | 网页生产版静态服务器 |
-| `scripts/` | 构建、资源生成及当前版本浏览器 / 桌面回归脚本 |
-| `tests/` | 自动化回归和最小固定样片 |
-| `docs/` | 当前相框文案的参考来源 |
-| `dist/` | 本机最新网页构建，可重新生成，不上传 Git |
-| `release/` | 本机最新 Mac 安装包与桌面应用，不上传 Git |
-| `node_modules/` | 本机开发依赖，由 npm ci 生成，不上传 Git |
+## 加一圈相纸，留下一句心情
 
-历史需求稿、开发计划、验收报告、截图、个人照片试验、重复模型源权重、无引用样片和旧安装包已清理。测试输出默认写入系统临时目录。
+打开拍立得相框，给成品加上暖白边框与留白签名。内置 **48 条中英文短句**，可按主题与语言挑选；经你同意，也可以展示照片中的拍摄信息。
 
-## 回归验证
+![真实 PNG 相框成品：复古胶片人像和彩铅手绘猫咪，配以 Life lately. 文案](docs/showcase/frames.jpg)
 
-```sh
-npm run typecheck
-npm run verify:model
-npm run test:run -- --maxWorkers=1
-npm run test:models
-# 先启动 npm start；浏览器测试默认使用本机 Google Chrome
-npm run test:browser
-npm run test:desktop
-npm run test:desktop-open
-# 验证打包后的应用（在移除打包中间目录前运行）
-DESKTOP_EXECUTABLE="$PWD/release/mac-arm64/Pixel & Toon Studio.app/Contents/MacOS/Pixel & Toon Studio" npm run test:editor
-```
+相框、文字与处理效果一起导出，保存下来就能分享。
 
-保留测试代码及其实际使用的三张小 PNG、一个 HEIC、两份模型数值基准，用于验证图片导入、外部文件打开、工作区保存、模型输出与分块接缝。来源与许可见 `tests/fixtures/`，没有个人照片依赖。它们不进入网页或桌面安装包。
+## 从导入到成品
 
-## 模型与数据
+| 想做什么 | 在这里怎么做 |
+| :--- | :--- |
+| **直接导入手机照片** | 支持 HEIC / HEIF、PNG、JPEG、WebP；可选择文件、拖入或粘贴 |
+| **同时编辑几张照片** | 用标签切换，每张照片分别保留自己的风格与调整 |
+| **看清改动** | 完整效果、左右对比、原图三种预览；按住空格临时查看原图 |
+| **放心尝试** | 支持撤销、重做，双击滑块复位参数 |
+| **下次接着编辑** | 工作区自动保存在本机，重新打开后恢复 |
+| **保存最终成品** | 导出高清 PNG，包含增强、风格、调色和相框；不复制原始 EXIF |
+| **在 Mac 上顺手打开** | 支持 Finder「打开方式」和拖到 Dock 图标，照片进入编辑标签 |
 
-- **LiveAction SPAN ×2**：默认纹理增强，原生 ×2，Apache-2.0。[说明与来源](public/models/liveaction-span-x2/README.md)。
-- **FFDNet**：固定 sigma=15/255 的颗粒降噪，随后双三次放大 ×2，MIT 实现。[说明与来源](public/models/ffdnet-color/README.md)。
+### 照片留在你的设备上
 
-模型优先使用 WebGPU，失败后使用 WASM。输入上限 6 MP，输出上限 24 MP / 单边 12,000 px；普通图片导入也受 24 MP / 单边 12,000 px 上限约束。增强不会重绘人脸；严重失焦和运动模糊的修复能力有限。
+图片处理、HEIC 解码和模型推理都在本机完成。**不上传照片，不需要登录，不需要购买 API 调用。** Mac 安装包自带模型和运行时，可以离线使用；网页版在相应资源缓存完成后也支持离线编辑。
 
-智能调色是本机光色算法，默认关闭。高清导出包含增强、艺术风格、光色微调与相框，不复制原始 EXIF；「下载底图」只保存模型结果。读取 EXIF 需用户同意。
+工作区适合继续创作，导出的 PNG 适合长期保存。Mac 与浏览器的工作区独立，清理浏览器站点数据会清空其中的照片和编辑记录。
 
-第三方许可保留在 `public/` 与 [桌面版第三方声明](desktop/THIRD_PARTY_NOTICES.md)；相框文案来源见 [CAPTION_SOURCES.md](docs/CAPTION_SOURCES.md)。
+## 下载即用
+
+**[下载最新版 Mac 安装包 →](https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest)**
+
+支持 **Apple Silicon · macOS 13 或更新版本**。打开 DMG，把应用拖进「应用程序」，再导入一张照片即可开始，无需安装 Node.js 或使用终端。
+
+当前版本采用 ad-hoc 签名，尚未进行 Apple 公证。如果 macOS 提示阻止打开，可在「系统设置 → 隐私与安全性」中选择「仍要打开」。Release 中同时提供 SHA-256 校验文件。
+
+---
+
+[开发与网页版运行说明](docs/DEVELOPMENT.md) · [展示图片与样片来源](docs/showcase/SOURCES.md) · [文案来源](docs/CAPTION_SOURCES.md) · [第三方许可](desktop/THIRD_PARTY_NOTICES.md) · [MIT License](LICENSE)
+
+展示图片来自当前版本的真实界面与处理输出，未使用生成式图片替代效果；为了便于浏览，展示图经过排版、缩小和 JPEG 压缩，应用实际导出格式为 PNG。
