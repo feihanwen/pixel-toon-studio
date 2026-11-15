@@ -5,8 +5,6 @@
   <p><strong>Transform everyday photos into anime stills, painted artworks, or vintage postcards.</strong></p>
   <p>100% on-device · Zero setup · Zero uploads · Privacy-first · No API keys required</p>
   <p>
-    <a href="https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest"><strong>Download for Mac (.dmg) ↗</strong></a>
-    &nbsp; · &nbsp;
     <a href="#real-world-examples">See Results</a>
     &nbsp; · &nbsp;
     <a href="#feature-overview">Feature Tour</a>
