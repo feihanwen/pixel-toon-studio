@@ -1,8 +1,10 @@
-import { STYLES, GLOBAL, styleParams, type StyleId, type GlobalKey } from '../config/styles';
+import { STYLES, GLOBAL, styleParams, styleShortName, type StyleId, type GlobalKey } from '../config/styles';
 import type { EditorSnapshot, PhotoTab, ExifFields } from '../types/document';
 import { captionText } from '../config/captions';
-import { FRAME_CATEGORIES, getFrameStyle } from '../config/frames';
+import { frameCategoryLabel, frameStyleName, getFrameStyle } from '../config/frames';
 import { frameKind, type FrameContent } from '../imaging/frame';
+import { usePreferences } from '../config/preferences';
+import { uiText } from '../config/i18n';
 import { ParameterSlider } from './ParameterSlider';
 import { StudioIcon } from './StudioIcon';
 import { duotonePalette } from '../worker/styles/duotone';
@@ -36,8 +38,9 @@ interface Props {
 }
 
 export function ControlsPanel(props: Props) {
+    const { language } = usePreferences();
+    const t = uiText(language);
     const { tab, snapshot: s, exif } = props;
-    const style = s ? STYLES[s.styleId] : null;
     const frameStyle = getFrameStyle(s?.frameStyleId);
     const content: FrameContent = {
         frameStyleId: s?.frameStyleId,
@@ -46,48 +49,49 @@ export function ControlsPanel(props: Props) {
         exif,
     };
     const definitions = s ? styleParams(s.styleId) : null;
+    const isExifContent = Boolean(content.showExif && content.exif && Object.values(content.exif).some(Boolean));
 
     return (
-        <aside className="controls" aria-label="照片编辑工具">
+        <aside className="controls" aria-label={t.controlsAria}>
             <div className="controls-top">
                 <div className="controls-title">
                     <span className="controls-symbol">
                         <StudioIcon name="sliders" size={20} />
                     </span>
-                    <h2>创作工具</h2>
+                    <h2>{t.controlsTitle}</h2>
                 </div>
-                <p>一点调整，让灵感自然发生。</p>
+                <p>{t.controlsSubtitle}</p>
             </div>
             {!tab || !s ? (
                 <div className="controls-empty">
                     <div className="section-heading">
-                        <span>发现你的风格</span>
-                        <span>8 种灵感</span>
+                        <span>{t.discoverStyle}</span>
+                        <span>{t.eightInspirations}</span>
                     </div>
                     <div className="style-preview-grid">
-                        {Object.entries(STYLES).map(([id, styleItem]) => (
+                        {(Object.keys(STYLES) as StyleId[]).map(id => (
                             <div className={`style-preview ${id}`} key={id}>
-                                <span aria-hidden="true">{styleItem.icon}</span>
-                                <strong>{styleItem.short}</strong>
+                                <span aria-hidden="true">{STYLES[id].icon}</span>
+                                <strong>{styleShortName(id, language)}</strong>
                             </div>
                         ))}
                     </div>
                     <div className="empty-tools-note">
                         <StudioIcon name="photo" size={22} />
                         <p>
-                            准备好一张喜欢的照片
+                            {t.emptyToolsLine1}
                             <br />
-                            <span>导入后即可选择风格、调整细节</span>
+                            <span>{t.emptyToolsLine2}</span>
                         </p>
                     </div>
                     <div className="tool-benefits">
                         <span>
                             <StudioIcon name="sparkles" size={16} />
-                            智能调色
+                            {t.benefitSmartColor}
                         </span>
                         <span>
                             <StudioIcon name="photo" size={16} />
-                            照片增强
+                            {t.benefitEnhance}
                         </span>
                     </div>
                 </div>
@@ -95,8 +99,8 @@ export function ControlsPanel(props: Props) {
                 <>
                     <section className="control-section">
                         <div className="section-heading">
-                            <span>视觉风格</span>
-                            <span>{Object.keys(STYLES).length} 种风格</span>
+                            <span>{t.visualStyleTitle}</span>
+                            <span>{t.stylesCount(Object.keys(STYLES).length)}</span>
                         </div>
                         <div className="style-grid">
                             {(Object.keys(STYLES) as StyleId[]).map(id => (
@@ -109,8 +113,8 @@ export function ControlsPanel(props: Props) {
                                     <span aria-hidden="true" className={`style-icon ${id}`}>
                                         {STYLES[id].icon}
                                     </span>
-                                    <span className="style-name">{STYLES[id].short}</span>
-                                    <span className="style-en">{STYLES[id].en}</span>
+                                    <span className="style-name">{styleShortName(id, language)}</span>
+                                    {language !== 'en' && <span className="style-en">{STYLES[id].en}</span>}
                                 </button>
                             ))}
                         </div>
@@ -118,18 +122,18 @@ export function ControlsPanel(props: Props) {
 
                     <details className="control-section style-parameters">
                         <summary>
-                            <span>{style?.short}参数</span>
-                            <small>双击复位</small>
+                            <span>{t.styleParamsTitle(styleShortName(s.styleId, language))}</span>
+                            <small>{t.doubleClickReset}</small>
                         </summary>
                         <div className="control-body">
                             {s.styleId === 'duotone' && (
-                                <div className="duotone-palette" aria-label="海报配色">
+                                <div className="duotone-palette" aria-label={t.duotonePaletteAria}>
                                     {Object.entries(
                                         duotonePalette(s.params.duotone.shadowHue, s.params.duotone.highlightHue),
                                     ).map(([key, rgb]) => (
                                         <span key={key}>
                                             <i style={{ backgroundColor: `rgb(${rgb.join(',')})` }} />
-                                            {key === 'dark' ? '暗部' : '亮部'}
+                                            {key === 'dark' ? t.duotoneDark : t.duotoneLight}
                                         </span>
                                     ))}
                                 </div>
@@ -138,11 +142,11 @@ export function ControlsPanel(props: Props) {
                                 Object.entries(definitions).map(([key, p]) => (
                                     <ParameterSlider
                                         key={`${s.styleId}-${key}`}
-                                        label={p.label}
+                                        label={language === 'en' ? p.labelEn : p.label}
                                         value={s.params[s.styleId][key]}
                                         min={p.min}
                                         max={p.max}
-                                        unit={p.unit}
+                                        unit={language === 'en' ? (p.unitEn ?? p.unit) : p.unit}
                                         defaultValue={p.default}
                                         onChange={v => props.onParam(key, v)}
                                         onCommit={props.onCommit}
@@ -156,18 +160,18 @@ export function ControlsPanel(props: Props) {
 
                     <details className="control-section global-adjustments">
                         <summary>
-                            <span>光色微调</span>
-                            <small>亮度 · 对比 · 饱和</small>
+                            <span>{t.globalAdjustmentsTitle}</span>
+                            <small>{t.globalAdjustmentsSub}</small>
                         </summary>
                         <div className="control-body">
                             {(Object.keys(GLOBAL) as GlobalKey[]).map(key => (
                                 <ParameterSlider
                                     key={key}
-                                    label={GLOBAL[key].label}
+                                    label={language === 'en' ? GLOBAL[key].labelEn : GLOBAL[key].label}
                                     value={s.global[key]}
                                     min={GLOBAL[key].min}
                                     max={GLOBAL[key].max}
-                                    unit={GLOBAL[key].unit}
+                                    unit={language === 'en' ? GLOBAL[key].unitEn : GLOBAL[key].unit}
                                     defaultValue={0}
                                     onChange={v => props.onGlobal(key, v)}
                                     onCommit={props.onCommit}
@@ -179,14 +183,14 @@ export function ControlsPanel(props: Props) {
 
                     <details className="control-section frame-panel">
                         <summary>
-                            <span>拍立得相框</span>
-                            <small>{s.frameEnabled ? frameStyle.name : '未开启'}</small>
+                            <span>{t.polaroidFrameTitle}</span>
+                            <small>{s.frameEnabled ? frameStyleName(frameStyle, language) : t.frameOff}</small>
                         </summary>
                         <div className="control-body">
                             <label className="toggle-row">
                                 <span>
-                                    <strong>添加相纸边框</strong>
-                                    <small>27 款外观 · 自动匹配原图比例</small>
+                                    <strong>{t.addFrameToggleTitle}</strong>
+                                    <small>{t.addFrameToggleSub}</small>
                                 </span>
                                 <input
                                     type="checkbox"
@@ -199,8 +203,8 @@ export function ControlsPanel(props: Props) {
                                 <div className="frame-options">
                                     <div className="caption-box frame-style-box">
                                         <div>
-                                            <span>相框外观</span>
-                                            <button onClick={props.onFrameStyle}>换一款 ↗</button>
+                                            <span>{t.frameStyleLabel}</span>
+                                            <button onClick={props.onFrameStyle}>{t.shuffleFrameStyle}</button>
                                         </div>
                                         <div className="frame-style-summary">
                                             <i
@@ -210,20 +214,20 @@ export function ControlsPanel(props: Props) {
                                             />
                                             <div>
                                                 <strong>
-                                                    {frameStyle.code} {frameStyle.name}
+                                                    {frameStyle.code} {frameStyleName(frameStyle, language)}
                                                 </strong>
-                                                <small> · {FRAME_CATEGORIES[frameStyle.category]}</small>
+                                                <small> · {frameCategoryLabel(frameStyle.category, language)}</small>
                                             </div>
                                         </div>
                                         <button className="choose-caption" onClick={props.onOpenFrameStyle}>
-                                            浏览并选择相框
+                                            {t.browseFrameStyles}
                                         </button>
                                     </div>
                                     {tab.exifContainerPresent && (
                                         <label className="toggle-row exif-toggle">
                                             <span>
-                                                <strong>读取并展示 EXIF</strong>
-                                                <small>仅设备、快门、光圈、ISO、日期</small>
+                                                <strong>{t.readExifTitle}</strong>
+                                                <small>{t.readExifSub}</small>
                                             </span>
                                             <input
                                                 type="checkbox"
@@ -233,9 +237,9 @@ export function ControlsPanel(props: Props) {
                                             <span className="toggle-ui" />
                                         </label>
                                     )}
-                                    {frameKind(content) === '拍摄信息' ? (
+                                    {isExifContent ? (
                                         <div className="caption-box">
-                                            <span>拍摄信息</span>
+                                            <span>{t.exifBoxTitle}</span>
                                             <p>
                                                 {[exif?.model, exif?.exposure, exif?.aperture, exif?.iso, exif?.date]
                                                     .filter(Boolean)
@@ -245,12 +249,12 @@ export function ControlsPanel(props: Props) {
                                     ) : (
                                         <div className="caption-box">
                                             <div>
-                                                <span>相框文案</span>
-                                                <button onClick={props.onCaption}>换一句 ↗</button>
+                                                <span>{t.captionBoxTitle}</span>
+                                                <button onClick={props.onCaption}>{t.shuffleCaption}</button>
                                             </div>
                                             <p>{captionText(s.captionId)}</p>
                                             <button className="choose-caption" onClick={props.onOpenCaption}>
-                                                浏览并选择文案
+                                                {t.browseCaptions}
                                             </button>
                                         </div>
                                     )}
@@ -262,13 +266,13 @@ export function ControlsPanel(props: Props) {
                     <div className="controls-footer">
                         <div className="history-actions">
                             <button onClick={props.onUndo} disabled={tab.history.cursor === 0}>
-                                ↶ 撤销
+                                {t.undoButton}
                             </button>
                             <button
                                 onClick={props.onRedo}
                                 disabled={tab.history.cursor >= tab.history.entries.length - 1}
                             >
-                                ↷ 重做
+                                {t.redoButton}
                             </button>
                         </div>
                         {(props.tabCount ?? 0) > 1 && props.onSyncAll && (
@@ -278,16 +282,16 @@ export function ControlsPanel(props: Props) {
                                 onClick={props.onSyncAll}
                                 disabled={props.exporting}
                             >
-                                同步当前风格至全部照片（{props.tabCount} 张）
+                                {t.syncAllTabsButton(props.tabCount ?? 0)}
                             </button>
                         )}
                         <button className="export-button" onClick={props.onExport} disabled={props.exporting}>
-                            {props.exporting ? `正在导出 ${props.exportProgress}` : '导出高清 PNG'} <span>↗</span>
+                            {props.exporting ? t.exportingButton(props.exportProgress) : t.exportButton} <span>↗</span>
                         </button>
                         <div className="export-note">
                             {s.frameEnabled
-                                ? `相框：${frameStyle.name}（印入${frameKind(content)}）`
-                                : '不添加相框'}{' '}
+                                ? t.exportNoteWithFrame(frameStyleName(frameStyle, language), frameKind(content, language))
+                                : t.exportNoteNoFrame}{' '}
                             · {props.outputSize?.width ?? tab.width} × {props.outputSize?.height ?? tab.height} px
                         </div>
                     </div>

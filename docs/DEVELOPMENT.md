@@ -10,15 +10,17 @@ npm run dev           # 网页开发服务器
 npm run desktop:start # 构建并启动 Electron
 ```
 
-## 生产版与 Mac 打包
+## 生产版与桌面端打包
 
 ```sh
 npm run build         # 生成 dist/
 npm start             # http://127.0.0.1:8787
-npm run desktop:dmg   # Apple Silicon DMG
+npm run desktop:dmg   # macOS Apple Silicon DMG
+npm run desktop:mac   # macOS DMG (通用)
+npm run desktop:win   # Windows NSIS 安装包与 Portable 便携版
 ```
 
-`HOST` / `PORT` 可调整静态服务器监听地址。`npm run desktop:pack` 只生成 `.app`；`npm run desktop:assets` 重新生成图标和安装背景，需要 Chrome 和 macOS 图像工具。
+`HOST` / `PORT` 可调整静态服务器监听地址。`npm run desktop:pack` 只生成绿色目录产物；`npm run desktop:assets` 重新生成多分辨率图标（.png、.icns、.ico）和 macOS 安装背景。
 
 `dist/`、`release/`、`node_modules/` 不进入 Git。每次发布时统一更新 package.json 与 package-lock.json，重新构建网页和安装包，发布对应版本标签。
 

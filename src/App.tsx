@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { type AutoColorPlan } from './imaging/autoColor';
 import { AutoColorPanel } from './components/AutoColorPanel';
 import { StudioIcon } from './components/StudioIcon';
-import { STYLES, GLOBAL, styleParams } from './config/styles';
+import { SettingsPanel } from './components/SettingsPanel';
+import { GLOBAL, styleParams, styleShortName } from './config/styles';
 import { CAPTIONS, pickRandomCaption, type Caption } from './config/captions';
 import {
     DEFAULT_FRAME_STYLE_ID,
@@ -11,6 +12,8 @@ import {
     type FrameStyle,
     type FrameStyleId,
 } from './config/frames';
+import { PreferencesProvider, usePreferences, isLanguageChosen } from './config/preferences';
+import { uiText } from './config/i18n';
 import type { EditorSnapshot, ExifFields, PhotoTab } from './types/document';
 import { snapshot } from './types/document';
 import { initialSnapshot, cloneSnapshot, applySharedSettings, commit, moveHistory } from './state/history';
@@ -22,6 +25,7 @@ import { CanvasStage } from './components/CanvasStage';
 import { ControlsPanel } from './components/ControlsPanel';
 import { CaptionPickerDialog } from './components/CaptionPickerDialog';
 import { FrameStylePickerDialog } from './components/FrameStylePickerDialog';
+import { LanguageOnboardingDialog } from './components/LanguageOnboardingDialog';
 import { EnhancementPanel } from './components/EnhancementPanel';
 import { autoColorPlan, basePixels, resolveBase } from './enhancement/images';
 import { cancelAllEnhancements, cancelEnhancement, runEnhancement, type EnhancementRequest } from './enhancement/orchestrator';
@@ -50,6 +54,16 @@ type FrameStylePickerState = {
 };
 
 export function App() {
+    return (
+        <PreferencesProvider>
+            <AppContent />
+        </PreferencesProvider>
+    );
+}
+
+function AppContent() {
+    const { language } = usePreferences();
+    const t = uiText(language);
     const [enhancementTasks, setEnhancementTasks] = useState<Record<string, EnhancementTask>>({});
     const [loadedSourceKey, setLoadedSourceKey] = useState('');
     const [colorPlan, setColorPlan] = useState<AutoColorPlan | null>(null);
@@ -64,6 +78,7 @@ export function App() {
     const [exportProgress, setExportProgress] = useState('');
     const [showOriginal, setShowOriginal] = useState(false);
     const [dialog, setDialog] = useState<string | null>(null);
+    const [showLanguageOnboarding, setShowLanguageOnboarding] = useState(() => !isLanguageChosen());
     const [captionPicker, setCaptionPicker] = useState<CaptionPickerState | null>(null);
     const [frameStylePicker, setFrameStylePicker] = useState<FrameStylePickerState | null>(null);
     const [exifData, setExifData] = useState<Record<string, ExifFields>>({});
@@ -79,7 +94,7 @@ export function App() {
     const recentRandom = useRef<string[]>([]);
     const recentRandomFrames = useRef<FrameStyleId[]>([]);
 
-    const active = tabs.find(t => t.id === activeId) ?? null;
+    const active = tabs.find(item => item.id === activeId) ?? null;
     const current = active ? (draft?.tabId === active.id ? draft.value : snapshot(active)) : null;
     const content = {
         frameStyleId:
@@ -99,9 +114,10 @@ export function App() {
         };
     }, []);
 
-    const { ready, saveFailed, status, markDirty, hasDirty, removeTabFromStorage, flushWorkspace } = useWorkspaceSync({
+    const { ready, saveFailed, markDirty, hasDirty, removeTabFromStorage, flushWorkspace } = useWorkspaceSync({
         tabs,
         activeId,
+        language,
         onLoaded: (loadedTabs, loadedActiveId) => {
             setTabs(loadedTabs);
             setActiveId(loadedActiveId);
@@ -212,7 +228,7 @@ export function App() {
             } catch (e) {
                 if (rev === revision.current) {
                     setProcessing(false);
-                    setNotice(`预览处理失败：${e instanceof Error ? e.message : '未知错误'}`);
+                    setNotice(t.previewFailed(e instanceof Error ? e.message : t.unknownError));
                 }
             }
         }, 70);
@@ -239,7 +255,7 @@ export function App() {
                     setExifData(prev => ({ ...prev, [active.id]: fields }));
                 }
             })
-            .catch(() => setNotice('EXIF 信息读取失败，已使用文案'));
+            .catch(() => setNotice(t.exifReadFailed));
         return () => {
             cancelled = true;
         };
@@ -251,7 +267,7 @@ export function App() {
         draftRef.current = null;
         markDirty(d.tabId);
         setDraft(null);
-        setTabs(prev => prev.map(t => (t.id === d.tabId ? { ...t, history: commit(t.history, d.value) } : t)));
+        setTabs(prev => prev.map(item => (item.id === d.tabId ? { ...item, history: commit(item.history, d.value) } : item)));
     }
 
     function commitEdit(updater: (s: EditorSnapshot) => EditorSnapshot, id = activeId) {
@@ -259,7 +275,9 @@ export function App() {
         finishDraft();
         markDirty(id);
         setTabs(prev =>
-            prev.map(t => (t.id === id ? { ...t, history: commit(t.history, updater(cloneSnapshot(snapshot(t)))) } : t)),
+            prev.map(item =>
+                item.id === id ? { ...item, history: commit(item.history, updater(cloneSnapshot(snapshot(item)))) } : item,
+            ),
         );
     }
 
@@ -277,7 +295,9 @@ export function App() {
         if (!active) return;
         finishDraft();
         markDirty(active.id);
-        setTabs(prev => prev.map(t => (t.id === active.id ? { ...t, history: moveHistory(t.history, delta) } : t)));
+        setTabs(prev =>
+            prev.map(item => (item.id === active.id ? { ...item, history: moveHistory(item.history, delta) } : item)),
+        );
     }
 
     function syncAllTabs() {
@@ -286,21 +306,21 @@ export function App() {
         finishDraft();
         let syncedCount = 0;
         setTabs(prev =>
-            prev.map(t => {
-                if (t.id === active.id) return t;
-                const nextSnapshot = applySharedSettings(sourceSnapshot, snapshot(t));
-                const nextHistory = commit(t.history, nextSnapshot);
-                if (nextHistory !== t.history) {
-                    markDirty(t.id);
+            prev.map(item => {
+                if (item.id === active.id) return item;
+                const nextSnapshot = applySharedSettings(sourceSnapshot, snapshot(item));
+                const nextHistory = commit(item.history, nextSnapshot);
+                if (nextHistory !== item.history) {
+                    markDirty(item.id);
                     syncedCount++;
                 }
-                return { ...t, history: nextHistory };
+                return { ...item, history: nextHistory };
             }),
         );
         setNotice(
             syncedCount > 0
-                ? `已将「${STYLES[sourceSnapshot.styleId].short}」风格与参数同步到其余 ${tabs.length - 1} 张照片`
-                : '其余照片已是相同风格与参数',
+                ? t.syncNoticeUpdated(styleShortName(sourceSnapshot.styleId, language), tabs.length - 1)
+                : t.syncNoticeUnchanged,
         );
     }
 
@@ -318,19 +338,19 @@ export function App() {
                 finishDraft();
                 markDirty(targetId);
                 setTabs(prev =>
-                    prev.map(t =>
-                        t.id === targetId
+                    prev.map(item =>
+                        item.id === targetId
                             ? {
-                                  ...t,
-                                  history: commit(t.history, {
-                                      ...cloneSnapshot(snapshot(t)),
+                                  ...item,
+                                  history: commit(item.history, {
+                                      ...cloneSnapshot(snapshot(item)),
                                       enhancement: { enabled: true, resultId: result.id, strength: 100, sharpen: 25 },
                                   }),
                               }
-                            : t,
+                            : item,
                     ),
                 );
-                if (!persisted) setNotice('增强结果未保存到本机，请在关闭页面前导出');
+                if (!persisted) setNotice(t.enhanceNotPersisted);
             },
             referencedResults(tabs),
         ).catch(error => setNotice(error.message));
@@ -425,7 +445,7 @@ export function App() {
                 setActiveId(id);
                 setNotice('');
             } catch (e) {
-                setNotice(e instanceof Error ? e.message : '图片导入失败');
+                setNotice(e instanceof Error ? e.message : t.importFailed);
             }
         }
         setImporting(false);
@@ -433,15 +453,15 @@ export function App() {
 
     function closeTab(id: string) {
         if (activeTask(enhancementTasks[id])) {
-            if (!window.confirm('这张照片正在清晰化，关闭将尝试取消任务。确定关闭吗？')) return;
+            if (!window.confirm(t.confirmCancelEnhanceClose)) return;
             cancelEnhancement(id);
         }
         finishDraft();
-        if (hasDirty(id) && !window.confirm('这张照片的最新编辑尚未成功保存到本机。确定要关闭吗？')) return;
+        if (hasDirty(id) && !window.confirm(t.confirmUnsavedClose)) return;
         setCaptionPicker(null);
         setFrameStylePicker(null);
-        const index = tabs.findIndex(t => t.id === id);
-        const next = tabs.filter(t => t.id !== id);
+        const index = tabs.findIndex(item => item.id === id);
+        const next = tabs.filter(item => item.id !== id);
         setTabs(next);
         if (activeId === id) {
             setActiveId(next[Math.min(index, next.length - 1)]?.id ?? null);
@@ -495,17 +515,17 @@ export function App() {
         setDialog(null);
         markDirty(id);
         setTabs(prev =>
-            prev.map(t =>
-                t.id === id
+            prev.map(item =>
+                item.id === id
                     ? {
-                          ...t,
+                          ...item,
                           exifConsent: allow,
                           exifPrompted: true,
                           history: allow
-                              ? commit(t.history, { ...cloneSnapshot(snapshot(t)), showExif: true })
-                              : t.history,
+                              ? commit(item.history, { ...cloneSnapshot(snapshot(item)), showExif: true })
+                              : item.history,
                       }
-                    : t,
+                    : item,
             ),
         );
         if (!allow) {
@@ -543,10 +563,10 @@ export function App() {
                 ),
             );
             if (saved) {
-                setNotice(window.pixelToonDesktop ? 'PNG 已保存到所选位置' : 'PNG 已导出到下载文件夹');
+                setNotice(window.pixelToonDesktop ? t.pngSavedDesktop : t.pngSavedBrowser);
             }
         } catch (e) {
-            setNotice(`导出失败：${e instanceof Error ? e.message : '未知错误'}`);
+            setNotice(t.exportFailed(e instanceof Error ? e.message : t.unknownError));
         } finally {
             setExporting(false);
         }
@@ -581,10 +601,12 @@ export function App() {
         deps: [active, tabs],
     });
 
-    const styleName = current ? STYLES[current.styleId].short : '欢迎使用';
+    const styleName = current ? styleShortName(current.styleId, language) : t.welcomeStyle;
+    const platform = window.pixelToonDesktop?.platform;
+    const platformClass = platform === 'darwin' ? 'desktop-mac' : platform === 'win32' ? 'desktop-win' : '';
 
     return (
-        <div className={`app ${window.pixelToonDesktop?.platform === 'darwin' ? 'desktop-mac' : ''}`}>
+        <div className={`app ${platformClass}`}>
             <header className="topbar">
                 <div className="brand">
                     <div className="brand-mark">
@@ -592,51 +614,58 @@ export function App() {
                     </div>
                     <div>
                         <strong>Pixel & Toon</strong>
-                        <small>你的随身创作室</small>
+                        <small>{t.brandSubtitle}</small>
                     </div>
                 </div>
                 <div className="topbar-right">
-                    <div className={`save-status ${saveFailed ? 'failed' : ''}`}>
-                        <i />
-                        {ready ? status : '正在读取工作区'}
-                    </div>
+                    {saveFailed && (
+                        <div className="save-status failed">
+                            <i />
+                            {t.saveFailedStatus}
+                        </div>
+                    )}
+                    <SettingsPanel />
                     <button className="top-import" onClick={() => fileInput.current?.click()}>
                         <StudioIcon name="plus" size={17} />
-                        <span>导入图片</span>
+                        <span>{t.importButton}</span>
                     </button>
                 </div>
             </header>
 
             <div className="tabs">
                 <div className="tabs-scroll">
-                    {tabs.map((t, i) => (
-                        <div key={t.id} className={`tab ${t.id === activeId ? 'active' : ''}`}>
+                    {tabs.map((item, i) => (
+                        <div key={item.id} className={`tab ${item.id === activeId ? 'active' : ''}`}>
                             <button
                                 className="tab-main"
                                 onClick={() => {
                                     finishDraft();
                                     setCaptionPicker(null);
                                     setFrameStylePicker(null);
-                                    setActiveId(t.id);
+                                    setActiveId(item.id);
                                 }}
                             >
                                 <span className="tab-index">{String(i + 1).padStart(2, '0')}</span>
-                                <span className="tab-name" title={t.name}>
-                                    {t.name}
+                                <span className="tab-name" title={item.name}>
+                                    {item.name}
                                 </span>
                             </button>
-                            <button className="tab-close" aria-label={`关闭 ${t.name}`} onClick={() => closeTab(t.id)}>
+                            <button
+                                className="tab-close"
+                                aria-label={t.closeTabAria(item.name)}
+                                onClick={() => closeTab(item.id)}
+                            >
                                 ×
                             </button>
                         </div>
                     ))}
                     {tabs.length === 0 && (
                         <div className="tab-placeholder">
-                            <StudioIcon name="photo" size={16} /> 照片工作区
+                            <StudioIcon name="photo" size={16} /> {t.workspacePlaceholder}
                         </div>
                     )}
                 </div>
-                <div className="tab-count">{tabs.length} 张照片</div>
+                <div className="tab-count">{t.tabCount(tabs.length)}</div>
             </div>
 
             <main className="workspace">
@@ -648,14 +677,14 @@ export function App() {
                                     heading={
                                         <div className="work-photo-info">
                                             <span className="eyebrow">
-                                                照片 / {String(tabs.indexOf(active) + 1).padStart(2, '0')}
+                                                {t.photoEyebrow(String(tabs.indexOf(active) + 1).padStart(2, '0'))}
                                             </span>
                                             <h1>{active.name.replace(/\.[^.]+$/, '')}</h1>
                                             <p>
                                                 {styleName} <span>·</span> {outputSize?.width ?? active.width} ×{' '}
                                                 {outputSize?.height ?? active.height} px
                                                 {current.enhancement.enabled && current.enhancement.strength > 0
-                                                    ? ' · 已增强'
+                                                    ? t.enhancedBadge
                                                     : ''}
                                             </p>
                                         </div>
@@ -671,7 +700,7 @@ export function App() {
                                     processing={processing}
                                 />
                             ) : (
-                                <div className="loading-stage">正在打开图片…</div>
+                                <div className="loading-stage">{t.loadingPhoto}</div>
                             )}
                         </div>
                     ) : (
@@ -692,29 +721,29 @@ export function App() {
                                     <StudioIcon name="photo" size={22} />
                                 </div>
                             </div>
-                            <span className="eyebrow">灵感，从一张照片开始</span>
+                            <span className="eyebrow">{t.emptyEyebrow}</span>
                             <h1>
-                                把日常，
+                                {t.emptyHeadingLine1}
                                 <br />
-                                <em>变成心动的画面。</em>
+                                <em>{t.emptyHeadingLine2}</em>
                             </h1>
                             <p>
-                                动漫、像素、水彩，发现照片的另一种可能。
+                                {t.emptyDescriptionLine1}
                                 <br />
-                                一点光色，一点想象，刚刚好的创作。
+                                {t.emptyDescriptionLine2}
                             </p>
                             <button className="empty-import" onClick={() => fileInput.current?.click()}>
                                 <StudioIcon name="plus" size={20} />
-                                选择图片
+                                {t.choosePhoto}
                                 <StudioIcon name="arrow" size={18} />
                             </button>
                             <div className="empty-hint">
-                                <span className="desktop-import-hint">拖入图片，或按 ⌘ / Ctrl + V 粘贴 · </span>
-                                支持 HEIC、PNG、JPEG、WebP
+                                <span className="desktop-import-hint">{t.dropOrPasteHint}</span>
+                                {t.supportedFormatsHint}
                             </div>
                             <div className="privacy-note">
                                 <StudioIcon name="lock" size={13} />
-                                照片留在本机，安心创作
+                                {t.privacyNote}
                             </div>
                         </div>
                     )}
@@ -839,11 +868,11 @@ export function App() {
                 }}
             />
 
-            {importing && <div className="toast">正在导入图片…</div>}
+            {importing && <div className="toast">{t.importingToast}</div>}
             {notice && (
                 <div className="toast" role="status">
                     <span>{notice}</span>
-                    <button aria-label="关闭提示" onClick={() => setNotice('')}>
+                    <button aria-label={t.closeNoticeAria} onClick={() => setNotice('')}>
                         ×
                     </button>
                 </div>
@@ -851,7 +880,7 @@ export function App() {
             {dragging && (
                 <div className="drop-overlay">
                     <div>
-                        将图片放在这里
+                        {t.dropOverlayTitle}
                         <br />
                         <span>HEIC · PNG · JPEG · WebP</span>
                     </div>
@@ -877,6 +906,9 @@ export function App() {
                     onRandom={pickCaption}
                 />
             )}
+            {showLanguageOnboarding && (
+                <LanguageOnboardingDialog onClose={() => setShowLanguageOnboarding(false)} />
+            )}
             {dialog && (
                 <div
                     className="modal-backdrop"
@@ -887,15 +919,12 @@ export function App() {
                     <div className="modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
                         <div className="modal-icon">◈</div>
                         <span className="eyebrow">PRIVACY FIRST</span>
-                        <h2 id="privacy-title">读取拍摄信息？</h2>
-                        <p>
-                            读取 EXIF 可能会有泄露个人设备与拍摄时间等信息的风险。我们只读取设备型号、快门、光圈、ISO
-                            和拍摄日期，并将你选择展示的信息印在相框上。原图与信息不会上传。
-                        </p>
+                        <h2 id="privacy-title">{t.privacyModalTitle}</h2>
+                        <p>{t.privacyModalBody}</p>
                         <div className="modal-actions">
-                            <button onClick={() => decideExif(false)}>不读取，使用文案</button>
+                            <button onClick={() => decideExif(false)}>{t.privacyDecline}</button>
                             <button className="primary" onClick={() => decideExif(true)}>
-                                同意读取并展示
+                                {t.privacyAllow}
                             </button>
                         </div>
                     </div>

@@ -25,9 +25,14 @@ export function useEditorShortcuts({
     useEffect(() => {
         const keydown = (e: KeyboardEvent) => {
             if (isEditable(e.target)) return;
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+            const key = e.key.toLowerCase();
+            if ((e.metaKey || e.ctrlKey) && key === 'z') {
                 e.preventDefault();
                 onUndo(e.shiftKey ? 1 : -1);
+            } else if (e.ctrlKey && !e.metaKey && !e.shiftKey && key === 'y') {
+                // Windows standard Ctrl+Y Redo shortcut
+                e.preventDefault();
+                onUndo(1);
             } else if (
                 e.code === 'Space' &&
                 !e.repeat &&

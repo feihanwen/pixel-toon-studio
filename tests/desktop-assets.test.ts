@@ -39,4 +39,19 @@ describe('desktop local origin', () => {
         expect(png.filename).toBe('.._.._test.png');
         expect(png.data.length).toBe(30);
     });
+
+    it('includes valid macOS (.icns) and Windows (.ico) desktop icons and cross-platform builder config', async () => {
+        const { readFile } = await import('node:fs/promises');
+        const ico = await readFile(join(process.cwd(), 'desktop', 'assets', 'icon.ico'));
+        expect(ico.readUInt16LE(0)).toBe(0);
+        expect(ico.readUInt16LE(2)).toBe(1); // Type 1 = ICO
+        expect(ico.readUInt16LE(4)).toBeGreaterThanOrEqual(4); // Multiple icon sizes
+
+        const builderYml = await readFile(join(process.cwd(), 'electron-builder.yml'), 'utf8');
+        expect(builderYml).toContain('mac:');
+        expect(builderYml).toContain('win:');
+        expect(builderYml).toContain('desktop/assets/icon.ico');
+        expect(builderYml).toContain('nsis');
+        expect(builderYml).toContain('portable');
+    });
 });

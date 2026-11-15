@@ -1,9 +1,13 @@
 import { MAX_PIXELS, MAX_SIDE, PREVIEW_SIDE } from '../config/limits';
+import { getLanguage } from '../config/preferences';
 const RASTER_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const HEIF_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
 export const ACCEPTED = [...RASTER_TYPES, ...HEIF_TYPES];
 export const FILE_ACCEPT = [...ACCEPTED, '.heic', '.heif', '.png', '.jpg', '.jpeg', '.webp'].join(',');
-const FORMAT_ERROR = '仅支持 HEIC、HEIF、PNG、JPEG 和 WebP 图片';
+const formatError = () =>
+    getLanguage() === 'en'
+        ? 'Only HEIC, HEIF, PNG, JPEG, and WebP images are supported'
+        : '仅支持 HEIC、HEIF、PNG、JPEG 和 WebP 图片';
 
 // Finder and some browsers provide no MIME type for HEIC files. Inspect the
 // container as well as its name; MIME alone must not reject iPhone photos.
@@ -27,24 +31,38 @@ export async function prepareImageImport(file: File): Promise<Blob> {
             const { heicTo } = await import('heic-to/csp');
             return await heicTo({ blob: file, type: 'image/png' });
         } catch {
-            throw new Error(`${file.name}：无法读取 HEIC 图片，文件可能损坏或使用了不支持的编码`);
+            throw new Error(
+                getLanguage() === 'en'
+                    ? `${file.name}: Could not decode HEIC image; the file may be corrupted or use an unsupported encoding`
+                    : `${file.name}：无法读取 HEIC 图片，文件可能损坏或使用了不支持的编码`,
+            );
         }
     }
     if (RASTER_TYPES.includes(file.type)) return file;
     const extension = file.name.split('.').pop()?.toLowerCase();
     const type = ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' } as Record<string, string>)[extension ?? ''];
     if (type && (!file.type || file.type === 'application/octet-stream')) return new Blob([file], { type });
-    throw new Error(`${file.name}：${FORMAT_ERROR}`);
+    throw new Error(`${file.name}：${formatError()}`);
 }
 
 export async function decode(blob: Blob) {
-    if (!RASTER_TYPES.includes(blob.type)) throw new Error(FORMAT_ERROR);
+    if (!RASTER_TYPES.includes(blob.type)) throw new Error(formatError());
     let bitmap: ImageBitmap;
     try { bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' }); }
-    catch { throw new Error('无法解码这张图片，请确认文件格式和内容'); }
+    catch {
+        throw new Error(
+            getLanguage() === 'en'
+                ? 'Could not decode this image; please check the file format and content'
+                : '无法解码这张图片，请确认文件格式和内容',
+        );
+    }
     if (bitmap.width * bitmap.height > MAX_PIXELS || bitmap.width > MAX_SIDE || bitmap.height > MAX_SIDE) {
         bitmap.close();
-        throw new Error('图片超过 24 MP 或单边 12,000 px，请缩小后导入');
+        throw new Error(
+            getLanguage() === 'en'
+                ? 'Image exceeds 24 MP or 12,000 px per side; please resize before importing'
+                : '图片超过 24 MP 或单边 12,000 px，请缩小后导入',
+        );
     }
     return bitmap;
 }

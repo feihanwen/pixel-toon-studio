@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { isEditable } from './useEditorShortcuts';
+import { getLanguage } from '../config/preferences';
+import { uiText } from '../config/i18n';
 
 interface UseDesktopIntegrationOptions {
     ready: boolean;
@@ -54,7 +56,8 @@ export function useDesktopIntegration({
                 } while (requested && !cancelled);
             } catch (error) {
                 if (!cancelled) {
-                    onNotice(`图片导入失败：${error instanceof Error ? error.message : '无法读取文件'}`);
+                    const t = uiText(getLanguage());
+                    onNotice(t.desktopImportFailed(error instanceof Error ? error.message : t.unknownError));
                 }
             } finally {
                 draining = false;
@@ -93,7 +96,7 @@ export function useDesktopIntegration({
         () =>
             window.pixelToonDesktop?.onBeforeClose(async () => {
                 if (!ready || importing || exporting) {
-                    throw new Error('图片正在读取、导入或导出，请稍后关闭。');
+                    throw new Error(uiText(getLanguage()).desktopBusyBeforeClose);
                 }
                 await onBeforeCloseFlush();
             }),

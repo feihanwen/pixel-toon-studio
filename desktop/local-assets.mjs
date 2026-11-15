@@ -1,5 +1,5 @@
 import { readFile, realpath } from 'node:fs/promises';
-import { extname, resolve, sep } from 'node:path';
+import { extname, isAbsolute, relative, resolve } from 'node:path';
 
 export const APP_ORIGIN = 'pixel-toon://studio';
 export const APP_URL = `${APP_ORIGIN}/index.html`;
@@ -10,7 +10,7 @@ export function isAppUrl(value) {
     catch { return false; }
 }
 
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.onnx': 'application/octet-stream', '.png': 'image/png' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.onnx': 'application/octet-stream', '.png': 'image/png', '.ico': 'image/x-icon', '.svg': 'image/svg+xml' };
 
 // A stable, secure origin gives WebGPU, module Workers and IndexedDB the same
 // behavior as the web build, without opening a local HTTP server or file://.
@@ -23,10 +23,12 @@ export function createAssetHandler(root) {
             const pathname = decodeURIComponent(new URL(request.url).pathname);
             if (pathname.includes('\\') || pathname.includes('\0') || pathname === '/api' || pathname.startsWith('/api/')) throw new Error('Invalid path');
             const realRoot = await realpath(root);
-            const file = await realpath(resolve(realRoot, `.${pathname === '/' ? '/index.html' : pathname}`));
-            if (!file.startsWith(realRoot + sep)) throw new Error('Invalid path');
+            const target = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+            const file = await realpath(resolve(realRoot, target));
+            const rel = relative(realRoot, file);
+            if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new Error('Invalid path');
             const data = await readFile(file);
-            return new Response(request.method === 'HEAD' ? null : data, { headers: { ...headers, 'Content-Type': types[extname(file)] ?? 'application/octet-stream' } });
+            return new Response(request.method === 'HEAD' ? null : data, { headers: { ...headers, 'Content-Type': types[extname(file).toLowerCase()] ?? 'application/octet-stream' } });
         } catch { return new Response('Not found', { status: 404, headers }); }
     };
 }

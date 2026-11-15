@@ -2,11 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     FRAME_CATEGORIES,
     filterFrameStyles,
+    frameCategoryLabel,
+    frameStyleDescription,
+    frameStyleName,
     getFrameStyle,
     type FrameCategory,
     type FrameStyle,
     type FrameStyleId,
 } from '../config/frames';
+import { usePreferences } from '../config/preferences';
+import { uiText } from '../config/i18n';
 import './caption-picker.css';
 
 interface Props {
@@ -28,6 +33,8 @@ export function FrameStylePickerDialog({
     onCancel,
     onRandom,
 }: Props) {
+    const { language } = usePreferences();
+    const t = uiText(language);
     const [category, setCategory] = useState<FrameCategory | 'all'>('all');
     const dialog = useRef<HTMLDivElement>(null);
     const previousFocus = useRef<HTMLElement | null>(null);
@@ -80,21 +87,21 @@ export function FrameStylePickerDialog({
                 <div className="caption-dialog-heading">
                     <div>
                         <span className="eyebrow">POLAROID FRAME</span>
-                        <h2 id="frame-style-title">选择拍立得相框</h2>
-                        <p>共 27 款主题相纸，自动匹配当前照片比例，点击即可实时预览。</p>
+                        <h2 id="frame-style-title">{t.frameDialogTitle}</h2>
+                        <p>{t.frameDialogSub}</p>
                     </div>
-                    <button className="caption-close" aria-label="关闭相框选择器" onClick={onCancel}>
+                    <button className="caption-close" aria-label={t.frameDialogCloseAria} onClick={onCancel}>
                         ×
                     </button>
                 </div>
 
-                <div className="caption-filters themes frame-category-filters" aria-label="相框分类">
+                <div className="caption-filters themes frame-category-filters" aria-label={t.frameCategoryFilterAria}>
                     <button aria-pressed={category === 'all'} onClick={() => setCategory('all')}>
-                        全部款式
+                        {t.allFrameCategories}
                     </button>
                     {(Object.keys(FRAME_CATEGORIES) as FrameCategory[]).map(id => (
                         <button key={id} aria-pressed={category === id} onClick={() => setCategory(id)}>
-                            {FRAME_CATEGORIES[id]}
+                            {frameCategoryLabel(id, language)}
                         </button>
                     ))}
                 </div>
@@ -102,7 +109,7 @@ export function FrameStylePickerDialog({
                 <div
                     className="caption-list frame-style-list"
                     role="listbox"
-                    aria-label={`可选拍立得相框，共 ${options.length} 款`}
+                    aria-label={t.frameListAria(options.length)}
                 >
                     {options.map(item => (
                         <button
@@ -136,11 +143,11 @@ export function FrameStylePickerDialog({
                             </div>
                             <div className="frame-style-meta">
                                 <div className="frame-style-title-row">
-                                    <strong>{item.name}</strong>
+                                    <strong>{frameStyleName(item, language)}</strong>
                                     <code>{item.code}</code>
                                 </div>
-                                <p>{item.description}</p>
-                                <small>{FRAME_CATEGORIES[item.category]}</small>
+                                <p>{frameStyleDescription(item, language)}</p>
+                                <small>{frameCategoryLabel(item.category, language)}</small>
                             </div>
                         </button>
                     ))}
@@ -148,15 +155,19 @@ export function FrameStylePickerDialog({
 
                 <div className="caption-dialog-footer">
                     <div className="caption-selected">
-                        当前预览：{currentStyle.code} {currentStyle.name}（{FRAME_CATEGORIES[currentStyle.category]}）
+                        {t.frameCurrentPreview(
+                            currentStyle.code,
+                            frameStyleName(currentStyle, language),
+                            frameCategoryLabel(currentStyle.category, language),
+                        )}
                     </div>
                     <div>
                         <button className="caption-random" onClick={() => onPreview(onRandom(options, selectedId))}>
-                            随机一款
+                            {t.randomFrameBtn}
                         </button>
-                        <button onClick={onCancel}>取消</button>
+                        <button onClick={onCancel}>{t.cancelBtn}</button>
                         <button className="caption-confirm" onClick={onConfirm}>
-                            使用这款
+                            {t.confirmFrameBtn}
                         </button>
                     </div>
                 </div>

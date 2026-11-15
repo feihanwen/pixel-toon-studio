@@ -26,7 +26,8 @@ try {
         await app.evaluate(({ dialog }) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: globalThis.__qaOutput }); });
         await app.evaluate((_electron, output) => { globalThis.__qaOutput = output; }, join(output, 'heic-export.png'));
     } else {
-        browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+        const chromePath = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined);
+        browser = await chromium.launch({ ...(chromePath ? { executablePath: chromePath } : {}), headless: true });
         context = await browser.newContext({ viewport: { width: 1440, height: 960 }, acceptDownloads: true });
         page = await context.newPage();
         await page.goto(process.env.QA_URL || 'http://127.0.0.1:8787');

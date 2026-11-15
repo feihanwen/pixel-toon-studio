@@ -33,7 +33,8 @@ Everything happens locally on your computer: image decoding, custom canvas shade
 - 🪄 **Smart Color & Lighting Adjustments**: Algorithmic white balance and auto-levels for one-click correction of underexposed or color-cast photos, paired with global brightness, contrast, and saturation controls.
 - 📑 **Multi-Photo Tabs & One-Click Style Sync**: Open and edit multiple images in separate tabs. Seamlessly sync the active visual style, parameters, and frame settings across all open photos with a single click.
 - ⚡ **Multi-Threaded Parallel Tile Export**: Web Worker tiled rendering enables fast, high-resolution PNG exports without browser freezing, automatically stripping sensitive GPS metadata for your privacy.
-- 💻 **Cross-Platform & Fully Offline**: Native macOS desktop app optimized for Apple Silicon (with Finder "Open With" integration and Dock drag-and-drop), plus offline PWA browser support.
+- 🌐 **Full Bilingual UI & 6 Theme Color Palettes**: Built-in Preferences popover and first-launch language onboarding dialog to switch live between **Chinese / English** across the entire UI (including 8 styles, all fine-tuning parameters, 28 frames, captions, and native menu bar), **System / Light / Dark** modes, and 6 glassmorphic theme color palettes (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
+- 💻 **macOS & Windows Cross-Platform Offline Desktop App**: Native builds for both **macOS** (`.dmg`) and **Windows** (NSIS installer & standalone Portable `.exe`) featuring multi-resolution icons, OS "Open With" file associations, drag-and-drop, and platform-native shortcuts, plus offline PWA browser support.
 
 ---
 
@@ -144,6 +145,9 @@ Organized into 6 distinctive categories with a visual picker and quick random sh
 
 ## Thoughtful Workflow Features
 
+- 🌐 **First-Launch Language Onboarding & Live Switching**: Clean bilingual onboarding modal on first run, plus an instant Settings popover in the top bar to toggle between English and Simplified Chinese at any time — dynamically updating all style parameter names, frame categories, captions, and native OS menus.
+- 🎨 **Adaptive Themes & Color Palettes**: Choose between System, Light, and Dark modes, paired with 6 curated theme palettes (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo) that seamlessly tint window chrome and backdrops.
+- 🖥️ **Tailored Desktop Integrations**: Drag-enabled title bar and Dock drop on macOS; native title bar controls, NSIS setup, single-file Portable `.exe`, multi-resolution `.ico` icons, Explorer file associations, and full `Ctrl` shortcut mapping on Windows.
 - 📱 **Wide Format Support**: Accepts iPhone / iPad **HEIC / HEIF** formats out of the box, as well as PNG, JPEG, and WebP. Import via file picker, drag-and-drop, or clipboard paste (`Cmd/Ctrl + V`).
 - 📑 **Multi-Tab Workspace**: Edit multiple photos concurrently. Each tab maintains its own independent style, adjustments, and undo/redo history.
 - 🔄 **One-Click Batch Sync**: Finish dialing in the perfect look for one picture, then hit "Sync current style to all photos" to apply the same filter, parameters, and frame across all open tabs.
@@ -168,7 +172,14 @@ Organized into 6 distinctive categories with a visual picker and quick random sh
 
 > ⚠️ *Note*: The application package is currently self-signed. If macOS displays an "unidentified developer" warning on first launch, open **System Settings → Privacy & Security** and click **Open Anyway**.
 
-### 2. Web App & Offline Use
+### 2. Windows Desktop App
+
+> **Requirements**: Windows 10 / Windows 11 (x64 or ARM64)
+
+1. Download the Windows installer (`.exe` NSIS setup or `-portable.exe` standalone executable) from the **[GitHub Releases Page](https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest)**.
+2. Supports opening images directly from Windows File Explorer via "Open with → Pixel & Toon Studio", as well as Windows keyboard shortcuts (`Ctrl + O`, `Ctrl + V`, `Ctrl + Z`, `Ctrl + Y`).
+
+### 3. Web App & Offline Use
 
 Pixel & Toon Studio can also run as a static web application. Once loaded in your browser, service workers cache necessary assets so the studio continues working offline without an active internet connection.
 
@@ -189,11 +200,15 @@ npm install
 # 3. Launch local development server
 npm run dev
 
-# 4. Run automated test suite (124+ unit tests)
+# 4. Run automated test suite (20 test suites, 128 unit tests)
 npm test
 
 # 5. Build production bundle
 npm run build
+
+# 6. Package Desktop App for macOS / Windows
+npm run desktop:mac   # Build macOS DMG installer
+npm run desktop:win   # Build Windows NSIS installer & Portable executable
 ```
 
 For detailed architectural notes, worker pipelines, and packaging steps, see the [Development Guide (docs/DEVELOPMENT.md)](docs/DEVELOPMENT.md).

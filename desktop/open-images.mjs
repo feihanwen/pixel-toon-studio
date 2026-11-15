@@ -1,5 +1,5 @@
 import { open } from 'node:fs/promises';
-import { basename, extname, isAbsolute } from 'node:path';
+import { basename, extname, isAbsolute, win32 } from 'node:path';
 
 const imageTypes = {
     '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -7,8 +7,17 @@ const imageTypes = {
 };
 const MAX_FILE_BYTES = 128 * 1024 * 1024;
 
+export function isAbsoluteImagePath(value) {
+    if (typeof value !== 'string' || !value || value.startsWith('-')) return false;
+    return isAbsolute(value) || win32.isAbsolute(value);
+}
+
+function fileBasename(filePath) {
+    return filePath.includes('\\') && !filePath.includes('/') ? win32.basename(filePath) : basename(filePath);
+}
+
 export function imageArguments(argv) {
-    return argv.filter(value => typeof value === 'string' && isAbsolute(value) && imageTypes[extname(value).toLowerCase()]);
+    return argv.filter(value => isAbsoluteImagePath(value) && imageTypes[extname(value).toLowerCase()]);
 }
 
 // Only paths received from the OS enter this queue. The renderer cannot supply
@@ -18,7 +27,7 @@ export class OpenImageQueue {
     pending = new Set();
 
     add(path) {
-        if (typeof path !== 'string' || !isAbsolute(path) || this.pending.has(path)) return false;
+        if (!isAbsoluteImagePath(path) || this.pending.has(path)) return false;
         this.pending.add(path);
         this.paths.push(path);
         return true;
@@ -27,7 +36,7 @@ export class OpenImageQueue {
     async next() {
         const path = this.paths.shift();
         if (!path) return null;
-        const name = basename(path), type = imageTypes[extname(path).toLowerCase()];
+        const name = fileBasename(path), type = imageTypes[extname(path).toLowerCase()];
         let handle;
         try {
             if (!type) throw new Error('仅支持 HEIC、HEIF、PNG、JPEG 和 WebP 图片');

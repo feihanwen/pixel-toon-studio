@@ -74,7 +74,7 @@ try {
     await countTabs(7);
     assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
     record('opening files after closing the window creates one window and preserves all tabs');
-    if (process.env.DESKTOP_EXECUTABLE) {
+    if (process.env.DESKTOP_EXECUTABLE && process.platform === 'darwin') {
         const bundle = resolve(executablePath, '../../..');
         await promisify(execFile)('/usr/bin/open', ['-a', bundle, first]);
         await countTabs(8);

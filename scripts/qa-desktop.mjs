@@ -57,9 +57,13 @@ try {
         background: BrowserWindow.getAllWindows()[0].getBackgroundColor(),
     }));
     assert.equal(appearance.source, 'system');
-    assert.equal(await page.locator('.app').evaluate(el => el.classList.contains('desktop-mac')), true);
-    assert.equal(await page.locator('.topbar').evaluate(el => getComputedStyle(el).webkitAppRegion), 'drag');
-    assert.equal(await page.locator('.top-import').evaluate(el => getComputedStyle(el).webkitAppRegion), 'no-drag');
+    if (process.platform === 'darwin') {
+        assert.equal(await page.locator('.app').evaluate(el => el.classList.contains('desktop-mac')), true);
+        assert.equal(await page.locator('.topbar').evaluate(el => getComputedStyle(el).webkitAppRegion), 'drag');
+        assert.equal(await page.locator('.top-import').evaluate(el => getComputedStyle(el).webkitAppRegion), 'no-drag');
+    } else if (process.platform === 'win32') {
+        assert.equal(await page.locator('.app').evaluate(el => el.classList.contains('desktop-win')), true);
+    }
     await page.emulateMedia({ colorScheme: null });
     for (const theme of ['light', 'dark']) {
         await app.evaluate(({ nativeTheme }, value) => { nativeTheme.themeSource = value; }, theme);
@@ -99,13 +103,14 @@ try {
     await menu('editor-redo');
     await page.waitForFunction(() => document.querySelectorAll('.style-card')[3]?.getAttribute('aria-pressed') === 'true');
     record('native Undo/Redo menu controls photo edit history');
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
     await page.locator('.style-card').nth(2).click();
-    await page.keyboard.press('Meta+z');
+    await page.keyboard.press(`${mod}+z`);
     await page.waitForFunction(() => document.querySelectorAll('.style-card')[3]?.getAttribute('aria-pressed') === 'true');
-    await page.keyboard.press('Meta+Shift+z');
+    await page.keyboard.press(`${mod}+Shift+z`);
     await page.waitForFunction(() => document.querySelectorAll('.style-card')[2]?.getAttribute('aria-pressed') === 'true');
     await page.locator('.style-card').nth(3).click();
-    record('Mac keyboard shortcuts apply exactly one Undo/Redo operation');
+    record('keyboard shortcuts apply exactly one Undo/Redo operation');
 
     await page.locator('.enhancement-panel > summary').click();
     await generate();

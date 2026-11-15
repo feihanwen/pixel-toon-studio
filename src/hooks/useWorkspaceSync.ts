@@ -2,16 +2,26 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PhotoTab } from '../types/document';
 import { deleteTab, loadWorkspace, saveWorkspace } from '../storage/db';
 import { pruneRetiredModelCache } from '../enhancement/local/LocalEnhancerClient';
+import { getLanguage, type AppLanguage } from '../config/preferences';
+import { uiText } from '../config/i18n';
 
 interface UseWorkspaceSyncOptions {
     tabs: PhotoTab[];
     activeId: string | null;
+    language?: AppLanguage;
     onLoaded: (tabs: PhotoTab[], activeId: string | null) => void;
     onNotice: (message: string) => void;
     onDispose: () => void;
 }
 
-export function useWorkspaceSync({ tabs, activeId, onLoaded, onNotice, onDispose }: UseWorkspaceSyncOptions) {
+export function useWorkspaceSync({
+    tabs,
+    activeId,
+    language,
+    onLoaded,
+    onNotice,
+    onDispose,
+}: UseWorkspaceSyncOptions) {
     const [ready, setReady] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveFailed, setSaveFailed] = useState(false);
@@ -31,7 +41,7 @@ export function useWorkspaceSync({ tabs, activeId, onLoaded, onNotice, onDispose
                     ws.activeId,
                 );
             })
-            .catch(() => onNotice('无法读取本地工作区，仍可继续导入图片'))
+            .catch(() => onNotice(uiText(getLanguage()).workspaceLoadFailed))
             .finally(() => setReady(true));
         return () => {
             onDispose();
@@ -59,7 +69,7 @@ export function useWorkspaceSync({ tabs, activeId, onLoaded, onNotice, onDispose
                 .catch(() => {
                     setSaving(false);
                     setSaveFailed(true);
-                    onNotice('未保存到本机：浏览器存储空间可能不足。当前编辑仍可导出。');
+                    onNotice(uiText(getLanguage()).workspaceSaveQuotaFailed);
                 });
         }, 400);
         saveTimer.current = timer;
@@ -80,7 +90,7 @@ export function useWorkspaceSync({ tabs, activeId, onLoaded, onNotice, onDispose
         saveChain.current = saveChain.current
             .catch(() => {})
             .then(() => deleteTab(id))
-            .catch(() => onNotice('本地标签记录删除失败'));
+            .catch(() => onNotice(uiText(getLanguage()).deleteTabFailed));
     }
 
     async function flushWorkspace(latestTabs: PhotoTab[], latestActiveId: string | null) {
@@ -89,10 +99,11 @@ export function useWorkspaceSync({ tabs, activeId, onLoaded, onNotice, onDispose
         await saveWorkspace(latestTabs, latestActiveId);
     }
 
-    const status = useMemo(
-        () => (saveFailed ? '未保存到本机' : saving ? '正在保存' : '已保存到本机'),
-        [saveFailed, saving],
-    );
+    const activeLang = language ?? getLanguage();
+    const status = useMemo(() => {
+        const t = uiText(activeLang);
+        return saveFailed ? t.saveFailedStatus : saving ? t.savingStatus : t.savedStatus;
+    }, [saveFailed, saving, activeLang]);
 
     return {
         ready,

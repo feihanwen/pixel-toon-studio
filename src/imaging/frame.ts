@@ -1,6 +1,7 @@
 import type { ExifFields } from '../types/document';
 import { captionText } from '../config/captions';
 import { getFrameStyle, type FrameStyleId } from '../config/frames';
+import { getLanguage, type AppLanguage } from '../config/preferences';
 
 export interface FrameContent {
     frameStyleId?: FrameStyleId;
@@ -43,8 +44,10 @@ export function frameLabel(content: FrameContent) {
     return captionText(content.captionId);
 }
 
-export function frameKind(content: FrameContent) {
-    return content.showExif && content.exif && Object.values(content.exif).some(Boolean) ? '拍摄信息' : '文案';
+export function frameKind(content: FrameContent, lang: AppLanguage = getLanguage()) {
+    const isExif = Boolean(content.showExif && content.exif && Object.values(content.exif).some(Boolean));
+    if (lang === 'en') return isExif ? 'EXIF Info' : 'Caption';
+    return isExif ? '拍摄信息' : '文案';
 }
 
 function wrapFrameLabel(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
@@ -1022,7 +1025,7 @@ export function composeFrame(
         ctx.shadowBlur = Math.max(2, Math.round(font * 0.25));
     }
     ctx.fillStyle = theme.leftColor;
-    ctx.font = `600 ${font}px system-ui, sans-serif`;
+    ctx.font = `600 ${font}px system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.fillText(
@@ -1033,7 +1036,7 @@ export function composeFrame(
     );
 
     ctx.fillStyle = theme.rightColor;
-    ctx.font = `${font}px system-ui, sans-serif`;
+    ctx.font = `${font}px system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
     ctx.textAlign = 'right';
     const label = frameLabel(content);
     const allowed = width * 0.59 - textInset;

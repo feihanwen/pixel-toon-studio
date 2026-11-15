@@ -5,9 +5,24 @@ import { join } from 'node:path';
 import { imageArguments, OpenImageQueue } from '../desktop/open-images.mjs';
 
 describe('external desktop images', () => {
-    it('filters command-line options and accepts absolute image paths with spaces, Unicode and uppercase extensions', () => {
-        expect(imageArguments(['/Applications/App.app', '--inspect', '--pixel-toon-profile=/tmp/profile', '/tmp/我的 照片.HEIC', '/tmp/image.JPEG', 'relative.png', '/tmp/private.txt']))
-            .toEqual(['/tmp/我的 照片.HEIC', '/tmp/image.JPEG']);
+    it('filters command-line options and accepts POSIX and Windows absolute image paths with spaces, Unicode and uppercase extensions', () => {
+        expect(imageArguments([
+            '/Applications/App.app',
+            'C:\\Program Files\\Pixel & Toon Studio\\Pixel & Toon Studio.exe',
+            '--inspect',
+            '--pixel-toon-profile=/tmp/profile',
+            '/tmp/我的 照片.HEIC',
+            '/tmp/image.JPEG',
+            'C:\\Users\\Alice\\Pictures\\我的 照片.PNG',
+            '\\\\Server\\Share\\photo.webp',
+            'relative.png',
+            '/tmp/private.txt',
+        ])).toEqual([
+            '/tmp/我的 照片.HEIC',
+            '/tmp/image.JPEG',
+            'C:\\Users\\Alice\\Pictures\\我的 照片.PNG',
+            '\\\\Server\\Share\\photo.webp',
+        ]);
     });
 
     it('queues startup files in order, deduplicates pending paths and allows deliberate reopening', async () => {

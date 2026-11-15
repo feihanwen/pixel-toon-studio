@@ -4,6 +4,7 @@ import {
     CAPTION_THEMES,
     MAX_CUSTOM_CAPTION_LENGTH,
     captionText,
+    captionThemeLabel,
     customCaptionId,
     customCaptionValue,
     filterCaptions,
@@ -13,6 +14,8 @@ import {
     type CaptionLanguage,
     type CaptionTheme,
 } from '../config/captions';
+import { usePreferences } from '../config/preferences';
+import { uiText } from '../config/i18n';
 import './caption-picker.css';
 
 interface Props {
@@ -24,9 +27,13 @@ interface Props {
 }
 
 export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel, onRandom }: Props) {
+    const { language: appLang } = usePreferences();
+    const t = uiText(appLang);
     const [language, setLanguage] = useState<CaptionLanguage | 'all'>('all');
     const [theme, setTheme] = useState<CaptionTheme | 'all'>('all');
-    const [customText, setCustomText] = useState(() => (isCustomCaptionId(selectedId) ? customCaptionValue(selectedId) : ''));
+    const [customText, setCustomText] = useState(() =>
+        isCustomCaptionId(selectedId) ? customCaptionValue(selectedId) : '',
+    );
     const lastPresetId = useRef<string>(isCustomCaptionId(selectedId) ? CAPTIONS[0].id : selectedId);
     const dialog = useRef<HTMLDivElement>(null);
     const previousFocus = useRef<HTMLElement | null>(null);
@@ -93,16 +100,16 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                 <div className="caption-dialog-heading">
                     <div>
                         <span className="eyebrow">FRAME CAPTION</span>
-                        <h2 id="caption-title">选择相框文案</h2>
-                        <p>中英文短句，选一句配这张照片。</p>
+                        <h2 id="caption-title">{t.captionDialogTitle}</h2>
+                        <p>{t.captionDialogSub}</p>
                     </div>
-                    <button className="caption-close" aria-label="关闭文案选择器" onClick={onCancel}>
+                    <button className="caption-close" aria-label={t.captionDialogCloseAria} onClick={onCancel}>
                         ×
                     </button>
                 </div>
-                <div className="caption-filters" aria-label="文案语言">
+                <div className="caption-filters" aria-label={t.captionLangFilterAria}>
                     {([
-                        ['all', '全部语言'],
+                        ['all', t.allLanguages],
                         ['zh', '中文'],
                         ['en', 'English'],
                     ] as const).map(([id, label]) => (
@@ -111,13 +118,13 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                         </button>
                     ))}
                 </div>
-                <div className="caption-filters themes" aria-label="文案主题">
+                <div className="caption-filters themes" aria-label={t.captionThemeFilterAria}>
                     <button aria-pressed={theme === 'all'} onClick={() => setTheme('all')}>
-                        全部主题
+                        {t.allThemes}
                     </button>
                     {(Object.keys(CAPTION_THEMES) as CaptionTheme[]).map(id => (
                         <button key={id} aria-pressed={theme === id} onClick={() => setTheme(id)}>
-                            {CAPTION_THEMES[id]}
+                            {captionThemeLabel(id, appLang)}
                         </button>
                     ))}
                 </div>
@@ -125,9 +132,9 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                     <input
                         type="text"
                         className="caption-custom-input"
-                        aria-label="自定义相框文案"
+                        aria-label={t.customCaptionAria}
                         maxLength={MAX_CUSTOM_CAPTION_LENGTH}
-                        placeholder="或输入自定义相框文字（如地点、日期、心情）…"
+                        placeholder={t.customCaptionPlaceholder}
                         value={customText}
                         onChange={event => changeCustomText(event.target.value)}
                         onKeyDown={event => {
@@ -141,14 +148,14 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                         <button
                             type="button"
                             className="caption-custom-clear"
-                            aria-label="清空自定义文案"
+                            aria-label={t.clearCustomCaptionAria}
                             onClick={() => changeCustomText('')}
                         >
-                            清空
+                            {t.clearBtn}
                         </button>
                     )}
                 </div>
-                <div className="caption-list" role="listbox" aria-label={`可选文案，共 ${options.length} 句`}>
+                <div className="caption-list" role="listbox" aria-label={t.captionListAria(options.length)}>
                     {options.map(caption => (
                         <button
                             key={caption.id}
@@ -159,20 +166,21 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                         >
                             <span>{caption.text}</span>
                             <small>
-                                {CAPTION_THEMES[caption.theme]} · {caption.language === 'zh' ? '中文' : 'English'}
+                                {captionThemeLabel(caption.theme, appLang)} ·{' '}
+                                {caption.language === 'zh' ? '中文' : 'English'}
                             </small>
                         </button>
                     ))}
                 </div>
                 <div className="caption-dialog-footer">
-                    <div className="caption-selected">当前预览：{captionText(selectedId)}</div>
+                    <div className="caption-selected">{t.captionCurrentPreview(captionText(selectedId))}</div>
                     <div>
                         <button className="caption-random" onClick={() => selectPreset(onRandom(options, selectedId))}>
-                            随机一句
+                            {t.randomCaptionBtn}
                         </button>
-                        <button onClick={onCancel}>取消</button>
+                        <button onClick={onCancel}>{t.cancelBtn}</button>
                         <button className="caption-confirm" onClick={onConfirm}>
-                            使用这句
+                            {t.confirmCaptionBtn}
                         </button>
                     </div>
                 </div>

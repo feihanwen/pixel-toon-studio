@@ -22,4 +22,5 @@ contextBridge.exposeInMainWorld('pixelToonDesktop', {
         ipcRenderer.on('desktop:before-close', handler);
         return () => ipcRenderer.removeListener('desktop:before-close', handler);
     },
+    setPreferences: prefs => ipcRenderer.invoke('desktop:set-preferences', prefs),
 });

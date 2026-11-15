@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { composeFrame, frameInfo, type FrameContent } from '../imaging/frame';
+import { usePreferences } from '../config/preferences';
+import { uiText } from '../config/i18n';
 
 interface Props {
     heading: ReactNode;
@@ -26,6 +28,8 @@ export function CanvasStage({
     showOriginal,
     processing,
 }: Props) {
+    const { language } = usePreferences();
+    const t = uiText(language);
     const before = useRef<HTMLCanvasElement>(null);
     const after = useRef<HTMLCanvasElement>(null);
     const [split, setSplit] = useState(0.5);
@@ -94,11 +98,11 @@ export function CanvasStage({
         <div className="stage-outer">
             <div className="work-heading">
                 {heading}
-                <div className="stage-view-controls" role="group" aria-label="预览显示方式">
+                <div className="stage-view-controls" role="group" aria-label={t.previewModeGroupAria}>
                     {([
-                        ['effect', '完整效果'],
-                        ['compare', '左右对比'],
-                        ['original', '原图'],
+                        ['effect', t.viewEffect],
+                        ['compare', t.viewCompare],
+                        ['original', t.viewOriginal],
                     ] as const).map(([mode, label]) => (
                         <button
                             key={mode}
@@ -111,10 +115,6 @@ export function CanvasStage({
                             {label}
                         </button>
                     ))}
-                </div>
-                <div className="work-badge">
-                    <span />
-                    实时预览
                 </div>
             </div>
             <div className="stage-viewport" ref={viewport}>
@@ -133,7 +133,7 @@ export function CanvasStage({
                         dragging.current = false;
                     }}
                 >
-                    <canvas ref={after} className="stage-canvas" aria-label="处理后的图片" />
+                    <canvas ref={after} className="stage-canvas" aria-label={t.processedCanvasAria} />
                     <canvas
                         ref={before}
                         className="stage-canvas"
@@ -143,7 +143,7 @@ export function CanvasStage({
                                 ? `inset(${top}% ${100 - ((layout.x + layout.photoWidth) / layout.width) * 100}% ${bottom}% ${left}%)`
                                 : `inset(${top}% ${right}% ${bottom}% ${left}%)`,
                         }}
-                        aria-label="原图比较区域"
+                        aria-label={t.originalCanvasAria}
                     />
                     {comparing && (
                         <div
@@ -164,7 +164,7 @@ export function CanvasStage({
                                 }
                             }}
                             role="slider"
-                            aria-label="原图与效果分割线"
+                            aria-label={t.compareSliderAria}
                             aria-valuenow={Math.round(split * 100)}
                             aria-valuemin={0}
                             aria-valuemax={100}
@@ -179,20 +179,14 @@ export function CanvasStage({
                     )}
                     {processing && (
                         <div className="stage-processing">
-                            <span className="pulse-dot" /> 正在生成预览
+                            <span className="pulse-dot" /> {t.renderingPreview}
                         </div>
                     )}
-                    {(originalVisible || comparing) && <span className="stage-corner left">原图</span>}
-                    {!originalVisible && <span className="stage-corner right">处理效果</span>}
+                    {(originalVisible || comparing) && <span className="stage-corner left">{t.cornerOriginal}</span>}
                 </div>
             </div>
             <div className="stage-hint">
-                {comparing
-                    ? '左侧原图 · 右侧效果 · 拖动分割线比较'
-                    : originalVisible
-                      ? '正在查看导入原图'
-                      : '正在查看完整处理效果'}{' '}
-                · 按住空格查看原图
+                {comparing ? t.hintComparing : originalVisible ? t.hintOriginal : t.hintEffect} · {t.hintHoldSpace}
             </div>
         </div>
     );

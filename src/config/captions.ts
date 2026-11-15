@@ -1,8 +1,23 @@
+import type { AppLanguage } from './preferences';
+
 export const CAPTION_THEMES = {
     daily: '日常碎片', travel: '出逃计划', city: '城市漫游', nature: '山野来信',
     friends: '见面快乐', together: '恋爱日常', playful: '随便发发', minimal: '极简短句'
 } as const;
+export const CAPTION_THEMES_EN: Record<keyof typeof CAPTION_THEMES, string> = {
+    daily: 'Daily Moments',
+    travel: 'Getaway',
+    city: 'City Walk',
+    nature: 'Into Nature',
+    friends: 'With Friends',
+    together: 'Sweet Time',
+    playful: 'Photo Dump',
+    minimal: 'Minimal',
+};
 export type CaptionTheme = keyof typeof CAPTION_THEMES;
+export function captionThemeLabel(theme: CaptionTheme, lang: AppLanguage = 'zh'): string {
+    return lang === 'en' ? CAPTION_THEMES_EN[theme] : CAPTION_THEMES[theme];
+}
 export type CaptionLanguage = 'zh' | 'en';
 export interface Caption { id: string; language: CaptionLanguage; theme: CaptionTheme; text: string; source: string; sourceUrl: string; adapted?: boolean }
 
