@@ -1,0 +1,33 @@
+{
+  "id": "realesr-anime-x2",
+  "version": "1.0.0",
+  "file": "model.onnx",
+  "sha256": "8bec767fbe65f97bbaf794c60e290bfde8d362f0d182236e9fa642b2761a8e6e",
+  "bytes": 2413501,
+  "parameters": 600652,
+  "scale": 2,
+  "outputScale": 2,
+  "tileSize": 128,
+  "overlap": 32,
+  "blend": 8,
+  "layout": "NCHW",
+  "channels": "RGB",
+  "license": "BSD-3-Clause",
+  "operators": [
+    "Add",
+    "Clip",
+    "Constant",
+    "Conv",
+    "DepthToSpace",
+    "Mul",
+    "Neg",
+    "Relu",
+    "Sub"
+  ],
+  "inputName": "input",
+  "outputName": "output",
+  "sourceCheckpoint": "RealESRGANv2-animevideo-xsx2.pth",
+  "sourceSha256": "27985aa2198711ecd72f9bb274ec7b164e018fc9ce2933daaa7c7ab36a2bd3fe",
+  "sourceUrl": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.3.0/RealESRGANv2-animevideo-xsx2.pth",
+  "author": "Xintao Wang et al. (ARC Lab, Tencent PCG)"
+}

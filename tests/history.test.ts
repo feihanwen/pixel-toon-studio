@@ -83,6 +83,7 @@ describe('saved workspace normalization', () => {
         source.global.brightness = 15;
         source.autoColor = { algorithmVersion: 2, enabled: true, strength: 85 };
         source.frameEnabled = true;
+        source.frameStyleId = 'magical-starlight';
         source.showExif = true;
         source.captionId = customCaptionId('Kamakura · Summer');
         source.enhancement = { enabled: true, resultId: 'source-result', strength: 90 };
@@ -97,11 +98,13 @@ describe('saved workspace normalization', () => {
         expect(synced.global.brightness).toBe(15);
         expect(synced.autoColor).toEqual({ algorithmVersion: 2, enabled: true, strength: 85 });
         expect(synced.frameEnabled).toBe(true);
+        expect(synced.frameStyleId).toBe('magical-starlight');
         expect(synced.captionId).toBe('custom:Kamakura · Summer');
         expect(synced.enhancement).toEqual({ enabled: true, resultId: 'target-result', strength: 60 });
         expect(synced.showExif).toBe(false);
 
         const restored = normalizeHistory({ entries: [synced], cursor: 0 }).entries[0];
         expect(restored.captionId).toBe('custom:Kamakura · Summer');
+        expect(restored.frameStyleId).toBe('magical-starlight');
     });
 });

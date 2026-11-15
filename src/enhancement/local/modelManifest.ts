@@ -1,5 +1,5 @@
 // Only trusted bundled models can select a URL/hash. Stored result images remain reusable.
-export type LocalProfile = 'liveaction' | 'denoise';
+export type LocalProfile = 'liveaction' | 'omnisr' | 'anime' | 'denoise';
 export type LocalBackend = 'webgpu' | 'wasm';
 export interface LocalModelManifest {
     id: string; version: string; label: string; profile: LocalProfile; path: string;
@@ -11,14 +11,25 @@ export const localModels: readonly LocalModelManifest[] = [
         path: 'models/liveaction-span-x2/model.onnx',
         sha256: 'bfa72f3c6347076aed140d0836cee30c27ea434c047beeaf9466469483836ecc', bytes: 1654748, parameters: 410700,
         scale: 2, tileSize: 128, overlap: 48, blend: 8, channels: 'RGB', license: 'Apache-2.0', maxInputPixels: 6000000 },
-    { id: 'ffdnet-color', version: '1.0.0', label: 'FFDNet', profile: 'denoise',
-        path: 'models/ffdnet-color/model.onnx',
-        sha256: 'b280d8ee55dac18e1a6a81a6b7ea7f8ab34fec816de9ef4e411a48eba817f4b4', bytes: 3419770, parameters: 852108,
+    { id: 'omnisr-x2', version: '1.0.0', label: 'OmniSR', profile: 'omnisr',
+        path: 'models/omnisr-x2/model.onnx',
+        sha256: '29f14332cd405890b2149c1c51fb81f66409e6da0ec21ca7d10e5b44200999c3', bytes: 3787919, parameters: 784604,
+        scale: 2, tileSize: 128, overlap: 48, blend: 8, channels: 'RGB', license: 'Apache-2.0', maxInputPixels: 6000000 },
+    { id: 'realesr-anime-x2', version: '1.0.0', label: 'RealESR-Anime', profile: 'anime',
+        path: 'models/realesr-anime-x2/model.onnx',
+        sha256: '8bec767fbe65f97bbaf794c60e290bfde8d362f0d182236e9fa642b2761a8e6e', bytes: 2413501, parameters: 600652,
+        scale: 2, tileSize: 128, overlap: 32, blend: 8, channels: 'RGB', license: 'BSD-3-Clause', maxInputPixels: 6000000 },
+    { id: 'nafnet-denoise', version: '1.0.0', label: 'NAFNet', profile: 'denoise',
+        path: 'models/nafnet-denoise/model.onnx',
+        sha256: '08d6db68baa9c68a358ad7114326b6127ee6d82867d9f192ca4c33df882a4317', bytes: 200096, parameters: 51107,
         scale: 1, tileSize: 128, overlap: 32, blend: 8, channels: 'RGB', license: 'MIT', maxInputPixels: 6000000 },
 ];
+export function isLocalProfile(value: unknown): value is LocalProfile {
+    return typeof value === 'string' && localModels.some(item => item.profile === value);
+}
 export function localModel(profile: LocalProfile = 'liveaction'): LocalModelManifest {
     const model = localModels.find(item => item.profile === profile);
-    if (!model) throw new Error('此模型已下架，请选择 LiveAction 或 FFDNet');
+    if (!model) throw new Error('此模型已下架，请选择受支持的本机模型');
     return model;
 }
 export function localCacheDescriptor(profile: LocalProfile = 'liveaction') {

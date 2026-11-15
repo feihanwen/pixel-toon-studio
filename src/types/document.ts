@@ -1,4 +1,5 @@
 import type { GlobalKey, ParamsByStyle, StyleId } from '../config/styles';
+import type { FrameStyleId } from '../config/frames';
 import type { EnhancementSelection } from './enhancement';
 export interface EditorSnapshot {
     autoColor: import('../imaging/autoColor').AutoColorSelection;
@@ -7,6 +8,7 @@ export interface EditorSnapshot {
     params: ParamsByStyle;
     global: Record<GlobalKey, number>;
     frameEnabled: boolean;
+    frameStyleId: FrameStyleId;
     showExif: boolean;
     captionId: string;
 }

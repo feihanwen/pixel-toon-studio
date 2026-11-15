@@ -1,4 +1,4 @@
-import { halftoneV2 } from './styles/halftoneV2';
+import { popArt } from './styles/popArt';
 import { applyAutoColor } from '../imaging/autoColor';
 import type { RenderRequest } from '../types/worker';
 import { adjust } from './shared/color';
@@ -28,7 +28,7 @@ export function render(req: RenderRequest): ArrayBuffer {
             out = watercolor(src, req.width, req.height, req.params, req.originX, req.originY, req.fullWidth, req.fullHeight);
             break;
         case 'halftone':
-            out = halftoneV2(src, req.width, req.height, req.params, req);
+            out = popArt(src, req.width, req.height, req.params, req);
             break;
         case 'manga':
             out = manga(src, req.width, req.height, req.params, req);

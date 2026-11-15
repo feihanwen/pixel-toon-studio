@@ -25,6 +25,7 @@
 .enhance-result .toggle-ui::after { width: 16px; height: 16px; }
 .enhance-result .toggle-row input:checked + .toggle-ui::after { transform: translateX(11px); }
 .enhance-download { border: 0; background: transparent; color: var(--accent); font-size: 10px; padding: 8px 0 8px 8px; white-space: nowrap; }
+.enhance-sliders { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
 .enhance-settings { margin-top: 12px; font-size: 10px; color: var(--secondary); }
 .enhance-settings > summary { cursor: pointer; padding: 8px 0; }
 .enhance-settings .parameter { margin-top: 15px; }

@@ -4,6 +4,13 @@ import { AutoColorPanel } from './components/AutoColorPanel';
 import { StudioIcon } from './components/StudioIcon';
 import { STYLES, GLOBAL, styleParams } from './config/styles';
 import { CAPTIONS, pickRandomCaption, type Caption } from './config/captions';
+import {
+    DEFAULT_FRAME_STYLE_ID,
+    FRAME_STYLES,
+    pickRandomFrameStyle,
+    type FrameStyle,
+    type FrameStyleId,
+} from './config/frames';
 import type { EditorSnapshot, ExifFields, PhotoTab } from './types/document';
 import { snapshot } from './types/document';
 import { initialSnapshot, cloneSnapshot, applySharedSettings, commit, moveHistory } from './state/history';
@@ -14,6 +21,7 @@ import { exportPng, exportFilename, download } from './imaging/export';
 import { CanvasStage } from './components/CanvasStage';
 import { ControlsPanel } from './components/ControlsPanel';
 import { CaptionPickerDialog } from './components/CaptionPickerDialog';
+import { FrameStylePickerDialog } from './components/FrameStylePickerDialog';
 import { EnhancementPanel } from './components/EnhancementPanel';
 import { autoColorPlan, basePixels, resolveBase } from './enhancement/images';
 import { cancelAllEnhancements, cancelEnhancement, runEnhancement, type EnhancementRequest } from './enhancement/orchestrator';
@@ -35,6 +43,12 @@ type CaptionPickerState = {
     previewId: string;
 };
 
+type FrameStylePickerState = {
+    tabId: string;
+    originalId: FrameStyleId;
+    previewId: FrameStyleId;
+};
+
 export function App() {
     const [enhancementTasks, setEnhancementTasks] = useState<Record<string, EnhancementTask>>({});
     const [loadedSourceKey, setLoadedSourceKey] = useState('');
@@ -51,6 +65,7 @@ export function App() {
     const [showOriginal, setShowOriginal] = useState(false);
     const [dialog, setDialog] = useState<string | null>(null);
     const [captionPicker, setCaptionPicker] = useState<CaptionPickerState | null>(null);
+    const [frameStylePicker, setFrameStylePicker] = useState<FrameStylePickerState | null>(null);
     const [exifData, setExifData] = useState<Record<string, ExifFields>>({});
     const [source, setSource] = useState<ImageData | null>(null);
     const [original, setOriginal] = useState<HTMLCanvasElement | null>(null);
@@ -62,10 +77,15 @@ export function App() {
     const revision = useRef(0);
     const draftRef = useRef<Draft | null>(null);
     const recentRandom = useRef<string[]>([]);
+    const recentRandomFrames = useRef<FrameStyleId[]>([]);
 
     const active = tabs.find(t => t.id === activeId) ?? null;
     const current = active ? (draft?.tabId === active.id ? draft.value : snapshot(active)) : null;
     const content = {
+        frameStyleId:
+            active && frameStylePicker?.tabId === active.id
+                ? frameStylePicker.previewId
+                : (current?.frameStyleId ?? DEFAULT_FRAME_STYLE_ID),
         captionId: active && captionPicker?.tabId === active.id ? captionPicker.previewId : (current?.captionId ?? ''),
         showExif: current?.showExif ?? false,
         exif: active ? (exifData[active.id] ?? null) : null,
@@ -304,7 +324,7 @@ export function App() {
                                   ...t,
                                   history: commit(t.history, {
                                       ...cloneSnapshot(snapshot(t)),
-                                      enhancement: { enabled: true, resultId: result.id, strength: 100 },
+                                      enhancement: { enabled: true, resultId: result.id, strength: 100, sharpen: 25 },
                                   }),
                               }
                             : t,
@@ -322,9 +342,39 @@ export function App() {
         return id;
     }
 
+    function pickFrameStyle(candidates: readonly FrameStyle[], currentId: FrameStyleId) {
+        const id = pickRandomFrameStyle(candidates, [
+            ...recentRandomFrames.current.filter(item => item !== currentId),
+            currentId,
+        ]).id;
+        recentRandomFrames.current = [...recentRandomFrames.current, id].slice(-10);
+        return id;
+    }
+
+    function openFrameStylePicker() {
+        if (!active || !current) return;
+        finishDraft();
+        setCaptionPicker(null);
+        setFrameStylePicker({
+            tabId: active.id,
+            originalId: current.frameStyleId,
+            previewId: current.frameStyleId,
+        });
+    }
+
+    function confirmFrameStylePicker() {
+        if (!frameStylePicker) return;
+        const { tabId, originalId, previewId } = frameStylePicker;
+        setFrameStylePicker(null);
+        if (previewId !== originalId) {
+            commitEdit(s => ({ ...s, frameStyleId: previewId }), tabId);
+        }
+    }
+
     function openCaptionPicker() {
         if (!active || !current) return;
         finishDraft();
+        setFrameStylePicker(null);
         setCaptionPicker({
             tabId: active.id,
             originalId: current.captionId,
@@ -371,6 +421,7 @@ export function App() {
                 markDirty(id);
                 setTabs(prev => [...prev, tab]);
                 setCaptionPicker(null);
+                setFrameStylePicker(null);
                 setActiveId(id);
                 setNotice('');
             } catch (e) {
@@ -388,6 +439,7 @@ export function App() {
         finishDraft();
         if (hasDirty(id) && !window.confirm('这张照片的最新编辑尚未成功保存到本机。确定要关闭吗？')) return;
         setCaptionPicker(null);
+        setFrameStylePicker(null);
         const index = tabs.findIndex(t => t.id === id);
         const next = tabs.filter(t => t.id !== id);
         setTabs(next);
@@ -404,7 +456,10 @@ export function App() {
 
     function frame(value: boolean) {
         if (!active) return;
-        if (!value) setCaptionPicker(null);
+        if (!value) {
+            setCaptionPicker(null);
+            setFrameStylePicker(null);
+        }
         commitEdit(s => ({ ...s, frameEnabled: value }));
         if (value && active.exifContainerPresent && !active.exifPrompted) {
             setDialog(active.id);
@@ -471,7 +526,12 @@ export function App() {
         try {
             const blob = await exportPng(
                 exportTab,
-                { ...content, captionId: current.captionId, showExif: current.showExif },
+                {
+                    ...content,
+                    frameStyleId: current.frameStyleId,
+                    captionId: current.captionId,
+                    showExif: current.showExif,
+                },
                 (done, total) => setExportProgress(`${Math.round((done / total) * 100)}%`),
             );
             const saved = await download(
@@ -556,6 +616,7 @@ export function App() {
                                 onClick={() => {
                                     finishDraft();
                                     setCaptionPicker(null);
+                                    setFrameStylePicker(null);
                                     setActiveId(t.id);
                                 }}
                             >
@@ -707,6 +768,12 @@ export function App() {
                                             s.enhancement.strength = strength;
                                         })
                                     }
+                                    onSharpen={sharpen =>
+                                        changeDraft(s => {
+                                            if (sharpen > 0) s.enhancement.sharpen = sharpen;
+                                            else delete s.enhancement.sharpen;
+                                        })
+                                    }
                                     onCommit={finishDraft}
                                 />
                             </>
@@ -742,6 +809,11 @@ export function App() {
                         })
                     }
                     onFrame={frame}
+                    onFrameStyle={() => {
+                        const id = pickFrameStyle(FRAME_STYLES, current?.frameStyleId ?? DEFAULT_FRAME_STYLE_ID);
+                        commitEdit(s => ({ ...s, frameStyleId: id }));
+                    }}
+                    onOpenFrameStyle={openFrameStylePicker}
                     onExif={exif}
                     onCaption={() => {
                         const id = pickCaption(CAPTIONS, current?.captionId ?? '');
@@ -784,6 +856,17 @@ export function App() {
                         <span>HEIC · PNG · JPEG · WebP</span>
                     </div>
                 </div>
+            )}
+            {frameStylePicker && frameStylePicker.tabId === activeId && (
+                <FrameStylePickerDialog
+                    selectedId={frameStylePicker.previewId}
+                    photoWidth={outputSize?.width ?? active?.width}
+                    photoHeight={outputSize?.height ?? active?.height}
+                    onPreview={id => setFrameStylePicker(prev => (prev ? { ...prev, previewId: id } : prev))}
+                    onConfirm={confirmFrameStylePicker}
+                    onCancel={() => setFrameStylePicker(null)}
+                    onRandom={pickFrameStyle}
+                />
             )}
             {captionPicker && captionPicker.tabId === activeId && (
                 <CaptionPickerDialog

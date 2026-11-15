@@ -5,10 +5,11 @@ import { buildExportTiles, resolveExportConcurrency, runParallelPool } from '../
 import { fixture, metrics, newStyles, processStyle } from './style-fixtures';
 
 describe('new styles: global grid and export seams', () => {
-    for (const id of newStyles) for (const [w, h, tileSide] of [[387, 259, 137], [1927, 173, 677]]) {
+    for (const id of ['pixel', ...newStyles] as const) for (const [w, h, tileSide] of [[387, 259, 137], [1927, 173, 677]]) {
         it(`${id}: ${w}x${h}, irregular tiles ${tileSide}`, () => {
             const source = fixture(w, h), params = { ...defaultParams()[id] };
             // Maximum support is important: halo must also be safe at slider endpoints.
+            if (id === 'pixel') params.size = 16;
             if (id === 'film') { params.halation = 100; params.smear = 100; }
             if (id === 'pencil') params.stroke = 8;
             if (id === 'manga') params.dot = 12;

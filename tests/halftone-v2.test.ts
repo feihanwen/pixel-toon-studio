@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { halftoneV2, halftonePeriod, dotCoverage } from '../src/worker/styles/halftoneV2';
+import { popArt } from '../src/worker/styles/popArt';
 import { halftone } from '../src/worker/styles/halftone';
 import { render } from '../src/worker/pipeline';
 import { defaultParams } from '../src/config/styles';
@@ -77,12 +78,12 @@ describe('fine pop art', () => {
         expect(clips(fine)).toBeLessThanOrEqual(clips(classic));
         for (let i = 0; i < fine.length; i += 4) { expect(fine[i]).toBeGreaterThan(fine[i + 1]); expect(fine[i + 1]).toBeGreaterThanOrEqual(fine[i + 2]); }
     });
-    it('always dispatches the fine renderer without a version switch', () => {
+    it('always dispatches the bold pop-art renderer without a version switch', () => {
         const src = fixture(128, 192), params = defaultParams().halftone;
         const req = { kind: 'render' as const, id: 1, tabId: 'a', revision: 1, mode: 'export' as const,
             width: 128, height: 192, ...ctx(128, 192), styleId: 'halftone' as const, params,
             global: { brightness: 0, contrast: 0, saturation: 0 } };
-        const expected = halftoneV2(src, 128, 192, params, ctx(128, 192));
+        const expected = popArt(src, 128, 192, params, ctx(128, 192));
         expect(new Uint8ClampedArray(render({ ...req, buffer: src.slice().buffer }))).toEqual(expected);
     });
     it('migrates all old snapshots directly to fine-pop parameters', () => {

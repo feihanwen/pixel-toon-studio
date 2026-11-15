@@ -1,6 +1,7 @@
 import { STYLES, GLOBAL, styleParams, type StyleId, type GlobalKey } from '../config/styles';
 import type { EditorSnapshot, PhotoTab, ExifFields } from '../types/document';
 import { captionText } from '../config/captions';
+import { FRAME_CATEGORIES, getFrameStyle } from '../config/frames';
 import { frameKind, type FrameContent } from '../imaging/frame';
 import { ParameterSlider } from './ParameterSlider';
 import { StudioIcon } from './StudioIcon';
@@ -23,6 +24,8 @@ interface Props {
     onResetParam: (key: string) => void;
     onResetGlobal: (key: GlobalKey) => void;
     onFrame: (value: boolean) => void;
+    onFrameStyle: () => void;
+    onOpenFrameStyle: () => void;
     onExif: (value: boolean) => void;
     onCaption: () => void;
     onOpenCaption: () => void;
@@ -35,7 +38,9 @@ interface Props {
 export function ControlsPanel(props: Props) {
     const { tab, snapshot: s, exif } = props;
     const style = s ? STYLES[s.styleId] : null;
+    const frameStyle = getFrameStyle(s?.frameStyleId);
     const content: FrameContent = {
+        frameStyleId: s?.frameStyleId,
         captionId: s?.captionId ?? '',
         showExif: s?.showExif ?? false,
         exif,
@@ -175,13 +180,13 @@ export function ControlsPanel(props: Props) {
                     <details className="control-section frame-panel">
                         <summary>
                             <span>拍立得相框</span>
-                            <small>{s.frameEnabled ? '已开启' : '未开启'}</small>
+                            <small>{s.frameEnabled ? frameStyle.name : '未开启'}</small>
                         </summary>
                         <div className="control-body">
                             <label className="toggle-row">
                                 <span>
                                     <strong>添加相纸边框</strong>
-                                    <small>暖白相纸与留白签名</small>
+                                    <small>27 款外观 · 自动匹配原图比例</small>
                                 </span>
                                 <input
                                     type="checkbox"
@@ -192,6 +197,28 @@ export function ControlsPanel(props: Props) {
                             </label>
                             {s.frameEnabled && (
                                 <div className="frame-options">
+                                    <div className="caption-box frame-style-box">
+                                        <div>
+                                            <span>相框外观</span>
+                                            <button onClick={props.onFrameStyle}>换一款 ↗</button>
+                                        </div>
+                                        <div className="frame-style-summary">
+                                            <i
+                                                className="frame-swatch"
+                                                style={{ background: frameStyle.previewBackground }}
+                                                aria-hidden="true"
+                                            />
+                                            <div>
+                                                <strong>
+                                                    {frameStyle.code} {frameStyle.name}
+                                                </strong>
+                                                <small> · {FRAME_CATEGORIES[frameStyle.category]}</small>
+                                            </div>
+                                        </div>
+                                        <button className="choose-caption" onClick={props.onOpenFrameStyle}>
+                                            浏览并选择相框
+                                        </button>
+                                    </div>
                                     {tab.exifContainerPresent && (
                                         <label className="toggle-row exif-toggle">
                                             <span>
@@ -258,8 +285,10 @@ export function ControlsPanel(props: Props) {
                             {props.exporting ? `正在导出 ${props.exportProgress}` : '导出高清 PNG'} <span>↗</span>
                         </button>
                         <div className="export-note">
-                            {s.frameEnabled ? `相框将印入：${frameKind(content)}` : '不添加相框'} ·{' '}
-                            {props.outputSize?.width ?? tab.width} × {props.outputSize?.height ?? tab.height} px
+                            {s.frameEnabled
+                                ? `相框：${frameStyle.name}（印入${frameKind(content)}）`
+                                : '不添加相框'}{' '}
+                            · {props.outputSize?.width ?? tab.width} × {props.outputSize?.height ?? tab.height} px
                         </div>
                     </div>
                 </>

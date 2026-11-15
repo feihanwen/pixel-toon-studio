@@ -5,7 +5,7 @@ import { relativeLuminance } from '../src/worker/shared/color';
 import { fixture, flat, metrics, newStyles, processStyle } from './style-fixtures';
 
 describe('new style contracts', () => {
-    for (const id of newStyles) {
+    for (const id of ['pixel', ...newStyles] as const) {
         it(`${id}: visible default, deterministic and no input mutation`, () => {
             const source = fixture(160, 120), saved = source.slice();
             const result = processStyle(id, source, 160, 120), diff = metrics(source, result);

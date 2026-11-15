@@ -1,5 +1,6 @@
 import { defaultAutoColor } from '../imaging/autoColor';
 import { defaultParams, GLOBAL, STYLES, type StyleId, type GlobalKey } from '../config/styles';
+import { DEFAULT_FRAME_STYLE_ID, isKnownFrameStyleId, type FrameStyleId } from '../config/frames';
 import {
     CAPTIONS,
     customCaptionId,
@@ -19,6 +20,7 @@ export function initialSnapshot(): EditorSnapshot {
         params: defaultParams(),
         global: { brightness: 0, contrast: 0, saturation: 0 },
         frameEnabled: false,
+        frameStyleId: DEFAULT_FRAME_STYLE_ID,
         showExif: false,
         captionId: randomCaption(),
     };
@@ -38,6 +40,7 @@ export function applySharedSettings(source: EditorSnapshot, target: EditorSnapsh
         params: clonedSource.params,
         global: clonedSource.global,
         frameEnabled: clonedSource.frameEnabled,
+        frameStyleId: clonedSource.frameStyleId,
         captionId: clonedSource.captionId,
     };
 }
@@ -93,10 +96,12 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
                 : GLOBAL[key].default;
         }
         const e = raw?.enhancement;
+        const sharpen = Number.isFinite(e?.sharpen) ? Math.max(0, Math.min(100, Math.round(e!.sharpen!))) : 0;
         const enhancement = {
             enabled: e?.enabled === true && typeof e.resultId === 'string',
             resultId: typeof e?.resultId === 'string' ? e.resultId : null,
             strength: Number.isFinite(e?.strength) ? Math.max(0, Math.min(100, Math.round(e.strength))) : 70,
+            ...(sharpen > 0 ? { sharpen } : {}),
         };
         const autoColor = {
             algorithmVersion: raw?.autoColor?.algorithmVersion === 2 ? (2 as const) : (1 as const),
@@ -111,6 +116,9 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
                 ? customCaptionId(customCaptionValue(raw.captionId))
                 : raw.captionId;
         }
+        const frameStyleId: FrameStyleId = isKnownFrameStyleId(raw?.frameStyleId)
+            ? raw.frameStyleId
+            : DEFAULT_FRAME_STYLE_ID;
         return {
             autoColor,
             enhancement,
@@ -118,6 +126,7 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
             params,
             global,
             frameEnabled: raw?.frameEnabled === true,
+            frameStyleId,
             showExif: raw?.showExif === true,
             captionId,
         };

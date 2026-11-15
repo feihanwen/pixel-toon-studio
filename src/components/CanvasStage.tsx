@@ -66,7 +66,17 @@ export function CanvasStage({
             target.height = composed.height;
             target.getContext('2d')?.drawImage(composed, 0, 0);
         }
-    }, [original, processed, width, height, frameEnabled, content.captionId, content.showExif, content.exif]);
+    }, [
+        original,
+        processed,
+        width,
+        height,
+        frameEnabled,
+        content.frameStyleId,
+        content.captionId,
+        content.showExif,
+        content.exif,
+    ]);
 
     const left = (layout.x / layout.width) * 100;
     const right = ((layout.width - layout.x - layout.photoWidth * split) / layout.width) * 100;

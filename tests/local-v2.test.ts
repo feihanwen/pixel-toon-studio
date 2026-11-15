@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { accumulateTile, finishRgb, rgbTilePlan, tileRgb } from '../src/enhancement/local/rgbTiles';
-import { checkLocalResources, localCacheDescriptor, localModel, modelAssetUrl } from '../src/enhancement/local/modelManifest';
+import { checkLocalResources, isLocalProfile, localCacheDescriptor, localModel, modelAssetUrl } from '../src/enhancement/local/modelManifest';
 import { selectLocalBackend } from '../src/enhancement/local/backend';
 import { readFileSync } from 'node:fs';
 import { localModels } from '../src/enhancement/local/modelManifest';
+import { applyAdaptiveUsm } from '../src/enhancement/usm';
+import { enhancementSharpen } from '../src/types/enhancement';
 
 describe('local model isolation and resource limits', () => {
     it('build-time registry matches the distributed manifests', () => {
@@ -14,16 +16,51 @@ describe('local model isolation and resource limits', () => {
             if (model.channels === 'RGB') expect(model.blend).toBe(json.blend);
         }
     });
-    it('ships only the complementary pair and isolates their caches', () => {
-        expect(localModels.map(model => model.profile)).toEqual(['liveaction', 'denoise']);
+    it('ships all 4 specialized local models and isolates their caches', () => {
+        expect(localModels.map(model => model.profile)).toEqual(['liveaction', 'omnisr', 'anime', 'denoise']);
         expect(localModel().profile).toBe('liveaction');
         expect(localCacheDescriptor()).toEqual({ adapter: 'local-onnx', id: 'liveaction-span-x2', version: '1.0.0', scale: 2, pipelineVersion: 3, profile: 'liveaction' });
-        expect(localCacheDescriptor('denoise')).not.toEqual(localCacheDescriptor());
+        for (const profile of ['omnisr', 'anime', 'denoise'] as const) {
+            expect(isLocalProfile(profile)).toBe(true);
+            expect(localCacheDescriptor(profile)).not.toEqual(localCacheDescriptor());
+            expect(localCacheDescriptor(profile).pipelineVersion).toBe(4);
+        }
         const model = localModel(), base = 'https://example.com/app/';
         expect(modelAssetUrl(model, base)).not.toBe(modelAssetUrl({ ...model, sha256: 'new-version' }, base));
-        for (const profile of ['fast', 'photo', 'detail', 'anime', 'invalid']) expect(() => localModel(profile as never)).toThrow('已下架');
+        for (const profile of ['fast', 'photo', 'detail', 'invalid']) expect(() => localModel(profile as never)).toThrow('已下架');
         expect(() => checkLocalResources(3000, 2100, model)).toThrow('6 MP');
         expect(checkLocalResources(1600, 1000, model)).toBeLessThan(768 * 1048576);
+    });
+});
+describe('Adaptive Unsharp Mask (USM)', () => {
+    it('suppresses low-amplitude noise in flat regions while sharpening mid-contrast edges without clipping halos', () => {
+        const w = 16, h = 16;
+        const flatNoisy = new Uint8ClampedArray(w * h * 4);
+        for (let i = 0; i < w * h; i++) {
+            const v = 120 + (i % 2 === 0 ? 1 : -1); // ±1 micro-noise (< coring threshold)
+            flatNoisy[i * 4] = v; flatNoisy[i * 4 + 1] = v; flatNoisy[i * 4 + 2] = v; flatNoisy[i * 4 + 3] = 255;
+        }
+        const beforeNoise = new Uint8ClampedArray(flatNoisy);
+        applyAdaptiveUsm(flatNoisy, w, h, 60);
+        expect([...flatNoisy]).toEqual([...beforeNoise]);
+
+        // Mid-contrast texture edge (105 vs 135) gets sharpened cleanly
+        const edgeImg = new Uint8ClampedArray(w * h * 4);
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const v = x < 8 ? 105 : 135;
+                const idx = (y * w + x) * 4;
+                edgeImg[idx] = v; edgeImg[idx + 1] = v; edgeImg[idx + 2] = v; edgeImg[idx + 3] = 255;
+            }
+        }
+        applyAdaptiveUsm(edgeImg, w, h, 50);
+        const leftEdge = edgeImg[(8 * w + 7) * 4];
+        const rightEdge = edgeImg[(8 * w + 8) * 4];
+        expect(leftEdge).toBeLessThan(105);
+        expect(rightEdge).toBeGreaterThan(135);
+        expect(rightEdge - leftEdge).toBeGreaterThan(30);
+        expect(enhancementSharpen({ enabled: true, resultId: 'id', strength: 100, sharpen: 35.4 })).toBe(35);
+        expect(enhancementSharpen({ enabled: true, resultId: 'id', strength: 100 })).toBe(0);
     });
 });
 describe('RGB tiles', () => {
