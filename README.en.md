@@ -19,9 +19,9 @@
 
 ![Pixel & Toon Studio editor interface: real-time split view comparison between coastal town original photo and watercolor effect](docs/showcase/editor.jpg)
 
-**Pixel & Toon Studio** is a privacy-first, on-device creative desktop and web application designed to bring artistic styling to your photos. Import any travel snapshot or daily picture to turn it into vibrant cel-shaded anime, expressive watercolor, retro 8-bit pixel art, pop-art comic halftones, or nostalgic vintage film. With 28 themed instant photo frames, 48 curated bilingual captions, custom typography, and camera EXIF data support, you can craft beautiful keepsake cards in seconds.
+**Pixel & Toon Studio** is a private, on-device creative photo studio for your desktop and web browser. Turn your favorite snapshots into anime stills, expressive watercolors, 8-bit pixel art, vintage pop-art halftones, or nostalgic 35mm film. Complete your piece with 28 curated instant polaroid frames, 48 bilingual travel quotes, custom typography, or camera EXIF specs — ready to export as high-resolution keepsake cards in one click.
 
-All image decoding, custom visual filters, and AI neural network inference run completely on your local machine. **No server uploads, no accounts, and no API keys.** Your images stay 100% private on your own hardware.
+Everything happens locally on your computer: image decoding, custom canvas shaders, and neural AI models run directly on your CPU/GPU. **No accounts, no API keys, and zero photo uploads.** Your photos never leave your device.
 
 ---
 

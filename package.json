@@ -43,7 +43,7 @@
     "vite": "6.4.5",
     "vitest": "4.1.12"
   },
-  "description": "本机照片清晰化与艺术风格编辑器",
+  "description": "On-device photo stylization, 2x AI super-resolution, polaroid frames & keepsake card creator",
   "author": "Pixel & Toon Studio",
   "main": "desktop/main.mjs"
 }
