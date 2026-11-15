@@ -5,8 +5,6 @@
   <p><strong>让每一张日常照片，都变成动漫分镜、手绘艺术或怀旧明信片。</strong></p>
   <p>纯本地端离线运行 · 零配置 · 零上传 · 保护隐私 · 无需 API Key</p>
   <p>
-    <a href="https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest"><strong>下载 Mac 版 (.dmg) ↗</strong></a>
-    &nbsp; · &nbsp;
     <a href="#实际效果案例">效果样例</a>
     &nbsp; · &nbsp;
     <a href="#核心功能一览">功能详解</a>
