@@ -72,6 +72,27 @@ describe('new style contracts', () => {
             expect(variance).toBeGreaterThan(previous); previous = variance;
         }
     });
+    it('film diffusion softens fine detail without adding noise or tint to a flat field', () => {
+        const w = 96, h = 72, source = flat(w, h, 128);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            const value = (x + y) % 2 ? 220 : 36;
+            for (let c = 0; c < 3; c++) source[(y * w + x) * 4 + c] = value;
+        }
+        const neutral = { fade: 0, warmth: 0, halation: 0, grain: 0, smear: 0 };
+        expect(processStyle('film', source, w, h, neutral)).toEqual(source);
+        const softened = processStyle('film', source, w, h, { ...neutral, smear: 100 });
+        let sourceVariation = 0, softVariation = 0;
+        for (let y = 12; y < h - 12; y++) for (let x = 12; x < w - 12; x++) {
+            const i = (y * w + x) * 4;
+            sourceVariation += Math.abs(source[i] - 128);
+            softVariation += Math.abs(softened[i] - 128);
+            expect(softened[i]).toBe(softened[i + 1]);
+            expect(softened[i]).toBe(softened[i + 2]);
+        }
+        expect(softVariation / sourceVariation).toBeLessThan(.2);
+        const uniform = flat(w, h, 128);
+        expect(processStyle('film', uniform, w, h, { ...neutral, smear: 100 })).toEqual(uniform);
+    });
     it('film halation is confined to the neighborhood of highlights', () => {
         const w = 128, h = 96, src = flat(w, h, 50);
         for (let y = 44; y < 50; y++) for (let x = 60; x < 66; x++) for (let c = 0; c < 3; c++) src[(y * w + x) * 4 + c] = 255;

@@ -5,6 +5,16 @@ import { defaultParams, STYLES } from '../src/config/styles';
 import type { History } from '../src/types/document';
 
 describe('saved workspace normalization', () => {
+    it('keeps diffusion off for existing film edits and preserves it in new edits', () => {
+        const old = initialSnapshot();
+        old.styleId = 'film';
+        old.params.film = { fade: 38, grain: 28, warmth: 24, halation: 22 };
+        const restored = normalizeHistory({ entries: [old], cursor: 0 }).entries[0];
+        expect(restored.params.film).toEqual({ ...old.params.film, smear: 0 });
+        expect(initialSnapshot().params.film.smear).toBeGreaterThan(0);
+        const current = initialSnapshot(); current.params.film.smear = 72;
+        expect(normalizeHistory({ entries: [current], cursor: 0 }).entries[0].params.film.smear).toBe(72);
+    });
     it('replaces retired captions and upgrades previous watercolor semantics', () => {
         const saved = initialSnapshot();
         saved.styleId = 'watercolor';
@@ -61,7 +71,7 @@ describe('saved workspace normalization', () => {
         history = commit(history, { ...structuredClone(history.entries[0]), styleId: 'film' });
         const changed = structuredClone(history.entries[1]); changed.params.film.grain = 80;
         history = commit(history, changed);
-        expect(moveHistory(history, -1).entries[1].params.film.grain).toBe(28);
+        expect(moveHistory(history, -1).entries[1].params.film.grain).toBe(defaultParams().film.grain);
         history = moveHistory(history, -1); expect(history.cursor).toBe(1);
         history = moveHistory(history, 1); expect(history.entries[history.cursor].params.film.grain).toBe(80);
         expect(normalizeHistory(history)).toEqual(history);

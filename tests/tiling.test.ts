@@ -8,7 +8,7 @@ describe('new styles: global grid and export seams', () => {
         it(`${id}: ${w}x${h}, irregular tiles ${tileSide}`, () => {
             const source = fixture(w, h), params = { ...defaultParams()[id] };
             // Maximum support is important: halo must also be safe at slider endpoints.
-            if (id === 'film') params.halation = 100;
+            if (id === 'film') { params.halation = 100; params.smear = 100; }
             if (id === 'pencil') params.stroke = 8;
             if (id === 'manga') params.dot = 12;
             const scale = Math.max(1, Math.max(w, h) / 1600), halo = exportHalo(id, params, scale, w, h);

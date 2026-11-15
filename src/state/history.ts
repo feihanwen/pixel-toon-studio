@@ -18,6 +18,8 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
             for (const key of Object.keys(definitions)) {
                 const candidate = raw?.params?.[id]?.[key];
                 let value = Number.isFinite(candidate) ? candidate : definitions[key].default;
+                // Existing film edits predate diffusion. Preserve those saved results.
+                if (id === 'film' && key === 'smear' && raw?.params?.film && !Number.isFinite(candidate)) value = 0;
                 if (legacyWatercolor && id === 'watercolor' && Number.isFinite(candidate)) {
                     if (key === 'radius') value = Math.min(12, value + 1);
                     if (key === 'smear') value = Math.round(Math.sqrt(Math.max(0, value) / 100) * 100);
