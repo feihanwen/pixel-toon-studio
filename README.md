@@ -20,7 +20,7 @@ Pixel & Toon Studio 就是用来做这件小事的。导入照片，选个风格
 
 ## 先看几张实际效果
 
-这里用了四种场景：京都雨巷、彩色海滨小镇、樱花街道，还有一家美式餐厅。下面都是当前版本实际导出的效果，使用默认参数，没有额外修图。
+这里用了四种场景：京都雨巷、彩色海滨小镇、樱花街道，还有一辆红色老车。下面都是当前版本实际导出的效果，使用默认参数，没有额外修图。
 
 ### 雨天的京都，试试漫画分镜
 
@@ -46,13 +46,13 @@ Pixel & Toon Studio 就是用来做这件小事的。导入照片，选个风格
 
 [打开彩铅手绘 PNG 大图](docs/showcase/samples/blossoms-pencil.png)
 
-### 美漫波普，换个更美式的场景
+### 红色老车，试试美漫波普
 
-这次换成了公路边的餐厅和老车。红色雨棚、霓虹招牌、车身轮廓放在一起，更适合看漫画分色、网点和墨线的变化。下面就是默认波普效果，没有再开智能调色。
+红色车身、蓝天和车轮轮廓，这张的主体更清楚。换成波普后，可以看看云层的分色、车身上的网点，以及轮廓边缘的变化。下面用的是默认参数，没有再开智能调色。
 
-![美式餐厅与老车：原图和美漫波普实际输出](docs/showcase/americana.jpg)
+![红色老车：原图和美漫波普实际输出](docs/showcase/car-pop.jpg)
 
-[打开美漫波普 PNG 大图](docs/showcase/samples/americana-pop.png)
+[打开美漫波普 PNG 大图](docs/showcase/samples/mustang-pop.png)
 
 ## 还可以换这些风格
 
@@ -108,6 +108,6 @@ Pixel & Toon Studio 就是用来做这件小事的。导入照片，选个风格
 
 ---
 
-谢谢原片的摄影师：**Hamza ERBAY、Sung Jin Cho、Stephan Widua、Preston Bousley**。[原图与展示制作说明](docs/showcase/SOURCES.md)里保留了来源。画廊为了便于浏览做了缩放、排版和 JPEG 压缩，文中的 PNG 链接是软件直接导出的文件。
+谢谢原片的摄影师：**Hamza ERBAY、Sung Jin Cho、Stephan Widua、Bernard Guevara**。[原图与展示制作说明](docs/showcase/SOURCES.md)里保留了来源。画廊为了便于浏览做了缩放、排版和 JPEG 压缩，文中的 PNG 链接是软件直接导出的文件。
 
 [文案来源](docs/CAPTION_SOURCES.md) · [第三方许可](desktop/THIRD_PARTY_NOTICES.md) · [MIT License](LICENSE)
