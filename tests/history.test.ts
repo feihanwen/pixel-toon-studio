@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { initialSnapshot, normalizeHistory, commit, moveHistory } from '../src/state/history';
-import { CAPTIONS } from '../src/config/captions';
+import { initialSnapshot, normalizeHistory, applySharedSettings, commit, moveHistory } from '../src/state/history';
+import { CAPTIONS, customCaptionId } from '../src/config/captions';
 import { defaultParams, STYLES } from '../src/config/styles';
 import type { History } from '../src/types/document';
 
@@ -75,5 +75,33 @@ describe('saved workspace normalization', () => {
         history = moveHistory(history, -1); expect(history.cursor).toBe(1);
         history = moveHistory(history, 1); expect(history.entries[history.cursor].params.film.grain).toBe(80);
         expect(normalizeHistory(history)).toEqual(history);
+    });
+    it('preserves custom captions and syncs shared style settings across tabs without overwriting per-photo enhancement or EXIF state', () => {
+        const source = initialSnapshot();
+        source.styleId = 'watercolor';
+        source.params.watercolor.radius = 10;
+        source.global.brightness = 15;
+        source.autoColor = { algorithmVersion: 2, enabled: true, strength: 85 };
+        source.frameEnabled = true;
+        source.showExif = true;
+        source.captionId = customCaptionId('Kamakura · Summer');
+        source.enhancement = { enabled: true, resultId: 'source-result', strength: 90 };
+
+        const target = initialSnapshot();
+        target.enhancement = { enabled: true, resultId: 'target-result', strength: 60 };
+        target.showExif = false;
+
+        const synced = applySharedSettings(source, target);
+        expect(synced.styleId).toBe('watercolor');
+        expect(synced.params.watercolor.radius).toBe(10);
+        expect(synced.global.brightness).toBe(15);
+        expect(synced.autoColor).toEqual({ algorithmVersion: 2, enabled: true, strength: 85 });
+        expect(synced.frameEnabled).toBe(true);
+        expect(synced.captionId).toBe('custom:Kamakura · Summer');
+        expect(synced.enhancement).toEqual({ enabled: true, resultId: 'target-result', strength: 60 });
+        expect(synced.showExif).toBe(false);
+
+        const restored = normalizeHistory({ entries: [synced], cursor: 0 }).entries[0];
+        expect(restored.captionId).toBe('custom:Kamakura · Summer');
     });
 });

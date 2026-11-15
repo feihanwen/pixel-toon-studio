@@ -6,9 +6,13 @@
 .caption-dialog-heading p { margin: 0; color: var(--secondary); font-size: 12px; }
 .caption-close { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 24px; color: var(--secondary); background: var(--glass); border: 1px solid var(--glass-border); line-height: 1; }
 .caption-filters { display: flex; gap: 7px; flex-wrap: wrap; padding: 6px 26px; }
-.caption-filters.themes { padding-bottom: 18px; border-bottom: 1px solid var(--divider); }
+.caption-filters.themes { padding-bottom: 14px; }
 .caption-filters button { border: 1px solid var(--glass-border); background: var(--glass); color: var(--secondary); border-radius: 20px; padding: 8px 12px; font-size: 11px; }
 .caption-filters button[aria-pressed=true] { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
+.caption-custom { display: flex; align-items: center; gap: 8px; padding: 0 26px 16px; border-bottom: 1px solid var(--divider); }
+.caption-custom-input { flex: 1; min-width: 0; border: 1px solid var(--glass-border); border-radius: 16px; background: var(--glass); color: var(--text); padding: 9px 14px; font-size: 12px; }
+.caption-custom-input::placeholder { color: var(--muted); }
+.caption-custom-clear { border: 1px solid var(--glass-border); border-radius: 16px; background: var(--glass); color: var(--secondary); padding: 8px 12px; font-size: 11px; white-space: nowrap; }
 .caption-list { padding: 18px 26px; overflow-y: auto; min-height: 100px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-content: start; }
 .caption-list button { min-height: 78px; text-align: left; border: 1px solid var(--glass-border); border-radius: 17px; background: var(--glass); color: var(--text); padding: 13px 15px; display: flex; flex-direction: column; justify-content: space-between; gap: 9px; }
 .caption-list button:hover { background: var(--glass-hover); }
@@ -22,5 +26,5 @@
 .caption-dialog-footer .caption-random { border-color: var(--accent-border); color: var(--accent); }
 .caption-dialog-footer .caption-confirm { border-color: transparent; background: var(--accent); color: var(--accent-text); font-weight: 600; }
 @media (max-width: 760px) {
-  .caption-dialog { width: 100%; max-height: 90dvh; border-radius: 25px; }.caption-dialog-heading { padding: 22px 20px 15px; }.caption-dialog-heading p { font-size: 11px; }.caption-filters { padding-left: 20px; padding-right: 20px; }.caption-filters button { min-height: 40px; }.caption-list { padding: 16px 20px; grid-template-columns: 1fr; }.caption-dialog-footer { padding: 16px 20px 20px; align-items: stretch; flex-direction: column; gap: 12px; }.caption-selected { max-width: none; }.caption-dialog-footer > div:last-child { justify-content: flex-end; }.caption-dialog-footer button { min-height: 44px; }.caption-close { min-width: 40px; min-height: 40px; }
+  .caption-dialog { width: 100%; max-height: 90dvh; border-radius: 25px; }.caption-dialog-heading { padding: 22px 20px 15px; }.caption-dialog-heading p { font-size: 11px; }.caption-filters, .caption-custom { padding-left: 20px; padding-right: 20px; }.caption-filters button { min-height: 40px; }.caption-list { padding: 16px 20px; grid-template-columns: 1fr; }.caption-dialog-footer { padding: 16px 20px 20px; align-items: stretch; flex-direction: column; gap: 12px; }.caption-selected { max-width: none; }.caption-dialog-footer > div:last-child { justify-content: flex-end; }.caption-dialog-footer button { min-height: 44px; }.caption-close { min-width: 40px; min-height: 40px; }
 }

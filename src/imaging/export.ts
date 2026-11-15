@@ -7,42 +7,194 @@ import type { PhotoTab } from '../types/document';
 import { snapshot } from '../types/document';
 import { STYLES } from '../config/styles';
 import { autoColorPlan, exportBase } from '../enhancement/images';
-export async function exportPng(tab: PhotoTab, content: FrameContent, onProgress: (done: number, total: number) => void) { const s = snapshot(tab), colorPlan = await autoColorPlan(tab, s), base = await exportBase(tab, s), bitmap = await decode(base.blob), worker = new WorkerClient(), w = bitmap.width, h = bitmap.height, scale = Math.max(1, Math.max(w, h) / PREVIEW_SIDE), halo = exportHalo(s.styleId, s.params[s.styleId], scale, w, h), result = document.createElement('canvas'); result.width = w; result.height = h; const resultCtx = result.getContext('2d'); if (!resultCtx) {
-    bitmap.close();
-    worker.dispose();
-    throw new Error('无法创建导出画布');
-} const tile = document.createElement('canvas'), tileCtx = tile.getContext('2d', { willReadFrequently: true }); if (!tileCtx) {
-    bitmap.close();
-    worker.dispose();
-    throw new Error('无法创建分块画布');
-} const total = Math.ceil(w / EXPORT_TILE) * Math.ceil(h / EXPORT_TILE); let done = 0; try {
-    for (let y = 0; y < h; y += EXPORT_TILE)
-        for (let x = 0; x < w; x += EXPORT_TILE) {
-            const cw = Math.min(EXPORT_TILE, w - x), ch = Math.min(EXPORT_TILE, h - y), sx = Math.max(0, x - halo), sy = Math.max(0, y - halo), ex = Math.min(w, x + cw + halo), ey = Math.min(h, y + ch + halo), tw = ex - sx, th = ey - sy;
-            tile.width = tw;
-            tile.height = th;
-            tileCtx.fillStyle = '#fff';
-            tileCtx.fillRect(0, 0, tw, th);
-            tileCtx.drawImage(bitmap, sx, sy, tw, th, 0, 0, tw, th);
-            const pixels = tileCtx.getImageData(0, 0, tw, th);
-            const response = await worker.render({ tabId: tab.id, revision: 0, mode: 'export', width: tw, height: th, originX: sx, originY: sy, fullWidth: w, fullHeight: h, scale, styleId: s.styleId, params: s.params[s.styleId], global: s.global, autoColor: colorPlan, buffer: pixels.data.buffer });
-            if (response.kind === 'error')
+
+export interface ExportTile {
+    x: number;
+    y: number;
+    cw: number;
+    ch: number;
+    sx: number;
+    sy: number;
+    tw: number;
+    th: number;
+}
+
+export function buildExportTiles(width: number, height: number, halo: number, tileSize = EXPORT_TILE): ExportTile[] {
+    const tiles: ExportTile[] = [];
+    for (let y = 0; y < height; y += tileSize) {
+        for (let x = 0; x < width; x += tileSize) {
+            const cw = Math.min(tileSize, width - x);
+            const ch = Math.min(tileSize, height - y);
+            const sx = Math.max(0, x - halo);
+            const sy = Math.max(0, y - halo);
+            const ex = Math.min(width, x + cw + halo);
+            const ey = Math.min(height, y + ch + halo);
+            tiles.push({
+                x,
+                y,
+                cw,
+                ch,
+                sx,
+                sy,
+                tw: ex - sx,
+                th: ey - sy,
+            });
+        }
+    }
+    return tiles;
+}
+
+export function resolveExportConcurrency(tileCount: number, hardwareConcurrency?: number): number {
+    if (tileCount <= 1) return 1;
+    const cores = Number.isFinite(hardwareConcurrency) && (hardwareConcurrency as number) > 0 ? (hardwareConcurrency as number) : 4;
+    const target = Math.max(2, Math.floor(cores / 2));
+    return Math.max(1, Math.min(tileCount, 4, target));
+}
+
+export async function runParallelPool<T>(
+    items: readonly T[],
+    concurrency: number,
+    workerFn: (item: T, slotIndex: number) => Promise<void>,
+): Promise<void> {
+    if (!items.length) return;
+    const poolSize = Math.max(1, Math.min(items.length, Math.floor(concurrency) || 1));
+    let nextIndex = 0;
+    let aborted = false;
+
+    const runners = Array.from({ length: poolSize }, async (_, slotIndex) => {
+        while (!aborted) {
+            const currentIndex = nextIndex++;
+            if (currentIndex >= items.length) break;
+            try {
+                await workerFn(items[currentIndex], slotIndex);
+            } catch (error) {
+                aborted = true;
+                throw error;
+            }
+        }
+    });
+
+    await Promise.all(runners);
+}
+
+export async function exportPng(
+    tab: PhotoTab,
+    content: FrameContent,
+    onProgress: (done: number, total: number) => void,
+) {
+    const s = snapshot(tab);
+    const colorPlan = await autoColorPlan(tab, s);
+    const base = await exportBase(tab, s);
+    const bitmap = await decode(base.blob);
+    const w = bitmap.width;
+    const h = bitmap.height;
+    const scale = Math.max(1, Math.max(w, h) / PREVIEW_SIDE);
+    const halo = exportHalo(s.styleId, s.params[s.styleId], scale, w, h);
+
+    const result = document.createElement('canvas');
+    result.width = w;
+    result.height = h;
+    const resultCtx = result.getContext('2d');
+    if (!resultCtx) {
+        bitmap.close();
+        throw new Error('无法创建导出画布');
+    }
+
+    const tiles = buildExportTiles(w, h, halo, EXPORT_TILE);
+    const total = tiles.length;
+    const poolSize = resolveExportConcurrency(
+        total,
+        typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : undefined,
+    );
+
+    const slots: Array<{
+        client: WorkerClient;
+        canvas: HTMLCanvasElement;
+        ctx: CanvasRenderingContext2D;
+    }> = [];
+
+    let done = 0;
+    try {
+        for (let i = 0; i < poolSize; i++) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (!ctx) {
+                throw new Error('无法创建分块画布');
+            }
+            slots.push({ client: new WorkerClient(), canvas, ctx });
+        }
+
+        await runParallelPool(tiles, poolSize, async (t, slotIndex) => {
+            const slot = slots[slotIndex];
+            slot.canvas.width = t.tw;
+            slot.canvas.height = t.th;
+            slot.ctx.fillStyle = '#fff';
+            slot.ctx.fillRect(0, 0, t.tw, t.th);
+            slot.ctx.drawImage(bitmap, t.sx, t.sy, t.tw, t.th, 0, 0, t.tw, t.th);
+            const pixels = slot.ctx.getImageData(0, 0, t.tw, t.th);
+
+            const response = await slot.client.render({
+                tabId: tab.id,
+                revision: 0,
+                mode: 'export',
+                width: t.tw,
+                height: t.th,
+                originX: t.sx,
+                originY: t.sy,
+                fullWidth: w,
+                fullHeight: h,
+                scale,
+                styleId: s.styleId,
+                params: s.params[s.styleId],
+                global: s.global,
+                autoColor: colorPlan,
+                buffer: pixels.data.buffer,
+            });
+            if (response.kind === 'error') {
                 throw new Error(response.message);
-            tileCtx.putImageData(new ImageData(new Uint8ClampedArray(response.buffer), tw, th), 0, 0);
-            resultCtx.drawImage(tile, x - sx, y - sy, cw, ch, x, y, cw, ch);
+            }
+
+            slot.ctx.putImageData(new ImageData(new Uint8ClampedArray(response.buffer), t.tw, t.th), 0, 0);
+            resultCtx.drawImage(slot.canvas, t.x - t.sx, t.y - t.sy, t.cw, t.ch, t.x, t.y, t.cw, t.ch);
             done++;
             onProgress(done, total);
+        });
+
+        const output = composeFrame(result, w, h, s.frameEnabled, content);
+        return await new Promise<Blob>((resolve, reject) =>
+            output.toBlob(
+                blob => (blob ? resolve(blob) : reject(new Error('PNG 编码失败，可能是浏览器内存不足'))),
+                'image/png',
+            ),
+        );
+    } finally {
+        bitmap.close();
+        for (const slot of slots) {
+            slot.client.dispose();
         }
-    const output = composeFrame(result, w, h, s.frameEnabled, content);
-    return await new Promise<Blob>((resolve, reject) => output.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG 编码失败，可能是浏览器内存不足')), 'image/png'));
+    }
 }
-finally {
-    bitmap.close();
-    worker.dispose();
-} }
-export function exportFilename(name: string, styleId: keyof typeof STYLES, enhanced = false) { const base = name.replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 100) || 'image'; return `${base}${enhanced ? '-enhanced' : ''}-pixel-toon-${STYLES[styleId].short}.png`; }
+
+export function exportFilename(name: string, styleId: keyof typeof STYLES, enhanced = false) {
+    const base =
+        name
+            .replace(/\.[^.]+$/, '')
+            .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
+            .slice(0, 100) || 'image';
+    return `${base}${enhanced ? '-enhanced' : ''}-pixel-toon-${STYLES[styleId].short}.png`;
+}
+
 export async function download(blob: Blob, name: string): Promise<boolean> {
-    if (window.pixelToonDesktop) return window.pixelToonDesktop.savePng(new Uint8Array(await blob.arrayBuffer()), name);
-    const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    if (window.pixelToonDesktop) {
+        return window.pixelToonDesktop.savePng(new Uint8Array(await blob.arrayBuffer()), name);
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
     return true;
 }

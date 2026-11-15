@@ -58,9 +58,40 @@ export const CAPTIONS: Caption[] = selections.flatMap(([theme, language, sourceK
 }));
 const byId = new Map(CAPTIONS.map(caption => [caption.id, caption]));
 
-export function getCaption(id: string): Caption | null { return byId.get(id) ?? null; }
-export function isKnownCaptionId(id: string): boolean { return byId.has(id); }
-export function captionText(id: string): string { return getCaption(id)?.text ?? CAPTIONS[0].text; }
+export const CUSTOM_CAPTION_PREFIX = 'custom:';
+export const MAX_CUSTOM_CAPTION_LENGTH = 48;
+
+export function normalizeCustomCaption(text: string): string {
+    return text.replace(/[\x00-\x1f\r\n]+/g, ' ').trim().slice(0, MAX_CUSTOM_CAPTION_LENGTH);
+}
+
+export function isCustomCaptionId(id: string): boolean {
+    return typeof id === 'string'
+        && id.startsWith(CUSTOM_CAPTION_PREFIX)
+        && normalizeCustomCaption(id.slice(CUSTOM_CAPTION_PREFIX.length)).length > 0;
+}
+
+export function customCaptionValue(id: string): string {
+    return isCustomCaptionId(id) ? normalizeCustomCaption(id.slice(CUSTOM_CAPTION_PREFIX.length)) : '';
+}
+
+export function customCaptionId(text: string): string {
+    const normalized = normalizeCustomCaption(text);
+    return normalized ? `${CUSTOM_CAPTION_PREFIX}${normalized}` : CAPTIONS[0].id;
+}
+
+export function getCaption(id: string): Caption | null {
+    return byId.get(id) ?? null;
+}
+
+export function isKnownCaptionId(id: string): boolean {
+    return byId.has(id) || isCustomCaptionId(id);
+}
+
+export function captionText(id: string): string {
+    if (isCustomCaptionId(id)) return customCaptionValue(id);
+    return getCaption(id)?.text ?? CAPTIONS[0].text;
+}
 export function filterCaptions(options: { language?: CaptionLanguage | 'all'; theme?: CaptionTheme | 'all' } = {}): Caption[] {
     return CAPTIONS.filter(caption => (options.language === undefined || options.language === 'all' || caption.language === options.language)
         && (options.theme === undefined || options.theme === 'all' || caption.theme === options.theme));

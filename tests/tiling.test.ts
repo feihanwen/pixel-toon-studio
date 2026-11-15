@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { defaultParams } from '../src/config/styles';
 import { exportHalo } from '../src/imaging/exportHalo';
+import { buildExportTiles, resolveExportConcurrency, runParallelPool } from '../src/imaging/export';
 import { fixture, metrics, newStyles, processStyle } from './style-fixtures';
 
 describe('new styles: global grid and export seams', () => {
@@ -27,4 +28,28 @@ describe('new styles: global grid and export seams', () => {
             expect(diff.max).toBeLessThanOrEqual(2);
         });
     }
+
+    it('schedules export tiles across a parallel worker pool with bounded concurrency', async () => {
+        const tiles = buildExportTiles(3200, 2400, 24, 1536);
+        expect(tiles).toHaveLength(6);
+        expect(resolveExportConcurrency(1, 8)).toBe(1);
+        expect(resolveExportConcurrency(6, 8)).toBe(4);
+        expect(resolveExportConcurrency(6, 4)).toBe(2);
+
+        let active = 0;
+        let maxActive = 0;
+        const visited: number[] = [];
+        await runParallelPool(tiles, 3, async (tile, slot) => {
+            expect(slot).toBeGreaterThanOrEqual(0);
+            expect(slot).toBeLessThan(3);
+            active++;
+            maxActive = Math.max(maxActive, active);
+            await new Promise(resolve => setTimeout(resolve, 10));
+            visited.push(tile.x + tile.y);
+            active--;
+        });
+        expect(visited).toHaveLength(6);
+        expect(maxActive).toBeGreaterThan(1);
+        expect(maxActive).toBeLessThanOrEqual(3);
+    });
 });
