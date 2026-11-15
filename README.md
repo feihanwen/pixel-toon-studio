@@ -158,33 +158,6 @@ Pixel & Toon Studio 内置 8 种经过反复调校的视觉风格，满足不同
 
 ---
 
-## 下载与运行
-
-### 1. Mac 桌面版
-
-> **系统要求**：macOS 13 (Ventura) 或更高版本 · Apple Silicon (M1/M2/M3/M4 系列芯片)
-
-1. 前往 **[Releases 最新发布页](https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest)** 下载 `.dmg` 安装包与 `.sha256` 校验文件。
-2. 双击打开 `.dmg`，将 **Pixel & Toon Studio** 拖入「应用程序 (Applications)」文件夹。
-3. 桌面端支持：
-   - 在 Finder 中右键任意图片，通过「打开方式 → Pixel & Toon Studio」直接启动；
-   - 直接将照片拖拽至 Dock 栏应用图标即可立即打开。
-
-> ⚠️ *说明*：安装包暂未经过 Apple 商业公证。若首次打开时系统提示“无法打开”或“来自未受信任的开发者”，请在 macOS 的 **「系统设置 → 隐私与安全性」** 中点击 **「仍要打开」** 即可。
-
-### 2. Windows 桌面版
-
-> **系统要求**：Windows 10 / Windows 11 (x64 或 ARM64)
-
-1. 前往 **[Releases 最新发布页](https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest)** 下载 Windows 安装包（`.exe` NSIS 安装程序或 `-portable.exe` 免安装便携版）。
-2. 支持在 Windows 资源管理器中右键图片选择「打开方式 → Pixel & Toon Studio」，或使用快捷键 `Ctrl + O` / `Ctrl + V` / `Ctrl + Z` / `Ctrl + Y` 高效编辑。
-
-### 3. 网页版与离线使用
-
-本项目同时支持纯前端静态部署。在浏览器中加载完毕后，依靠 Service Worker 与本地缓存，即使断开网络连接也能完全离线使用。
-
----
-
 ## 本地开发与构建
 
 想要查看源码、自行修改算法或本地运行：

@@ -158,33 +158,6 @@ Organized into 6 distinctive categories with a visual picker and quick random sh
 
 ---
 
-## Download & Installation
-
-### 1. Mac Desktop App
-
-> **Requirements**: macOS 13 (Ventura) or later · Apple Silicon (M1 / M2 / M3 / M4 series)
-
-1. Download the latest `.dmg` installer and `.sha256` checksum from the **[GitHub Releases Page](https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest)**.
-2. Open the `.dmg` and drag **Pixel & Toon Studio** into your `Applications` folder.
-3. System integrations:
-   - Right-click any image in Finder and choose "Open With → Pixel & Toon Studio";
-   - Drag images directly onto the app's Dock icon to open immediately.
-
-> ⚠️ *Note*: The application package is currently self-signed. If macOS displays an "unidentified developer" warning on first launch, open **System Settings → Privacy & Security** and click **Open Anyway**.
-
-### 2. Windows Desktop App
-
-> **Requirements**: Windows 10 / Windows 11 (x64 or ARM64)
-
-1. Download the Windows installer (`.exe` NSIS setup or `-portable.exe` standalone executable) from the **[GitHub Releases Page](https://github.com/feihanwen0928-eng/pixel-toon-studio/releases/latest)**.
-2. Supports opening images directly from Windows File Explorer via "Open with → Pixel & Toon Studio", as well as Windows keyboard shortcuts (`Ctrl + O`, `Ctrl + V`, `Ctrl + Z`, `Ctrl + Y`).
-
-### 3. Web App & Offline Use
-
-Pixel & Toon Studio can also run as a static web application. Once loaded in your browser, service workers cache necessary assets so the studio continues working offline without an active internet connection.
-
----
-
 ## Local Development & Building
 
 To explore the code, customize shaders/algorithms, or build locally:
