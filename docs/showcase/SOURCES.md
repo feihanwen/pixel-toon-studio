@@ -1,25 +1,36 @@
-# 展示图来源与制作说明
+# 展示图片与原片来源
 
-README 的所有界面与效果图均由 Pixel & Toon Studio v1.0.0 的实际生产构建产生。没有通过生成式图片模拟、修补或夸大处理效果。
+README 展示的是 Pixel & Toon Studio v1.0.0 实际处理这三张照片的结果。照片来自 Unsplash，按 [Unsplash License](https://unsplash.com/license) 用于产品效果展示。照片版权仍归原摄影师，项目的 MIT 许可证不改变照片本身的许可。
 
-## 原图
+## 三张原片
 
-采用与回归样片相同来源的 scikit-image v0.25.2 公开图片：
+| 编号 | 照片 | 摄影师 | 来源 |
+| --- | --- | --- | --- |
+| C | 京都雨巷，撑伞的行人与传统建筑 | Hamza ERBAY | [Unsplash 原片](https://unsplash.com/photos/woman-holding-grey-umbrella-iRx2qFPhgk4) |
+| D | 意大利五渔村的彩色房屋与海岸 | Sung Jin Cho | [Unsplash 原片](https://unsplash.com/photos/buildings-on-cliff-during-daytime-bwORldZq6BI) |
+| E | 德国波恩的樱花街道 | Stephan Widua | [Unsplash 原片](https://unsplash.com/it/foto/albero-di-ciliegio-rosa-vicino-alle-auto-parcheggiate-in-strada-durante-il-giorno-ae4VmMbhanQ) |
 
-| 原图 | 作者 / 权利说明 | 固定来源 |
-| --- | --- | --- |
-| astronaut.png（512 × 512） | NASA，宇航员 Eileen Collins；public domain | [原始文件](https://github.com/scikit-image/scikit-image/blob/v0.25.2/skimage/data/astronaut.png) |
-| chelsea.png（451 × 300） | Stefan van der Walt；CC0 | [原始文件](https://github.com/scikit-image/scikit-image/blob/v0.25.2/skimage/data/chelsea.png) |
+为控制展示素材与处理时间，输入下载为宽 1600 px 的 JPEG：C 为 1600 × 2133，D 与 E 为 1600 × 1067。样例图片不代表摄影师或图中人物对项目的认可。
 
-作者和许可说明：[scikit-image v0.25.2 官方数据说明](https://github.com/scikit-image/scikit-image/blob/v0.25.2/skimage/data/_fetchers.py)。人物与宠物图片仅用于说明功能，不代表原作者、NASA 或图中人物对项目的认可。
+## 实际处理方式
 
-## 文件对应关系
+- 所有艺术风格样例均使用当前生产构建，通过真实编辑器导入并导出 PNG；使用风格默认参数，智能调色与照片增强关闭。
+- `editor.jpg` 是应用真实界面的截图：导入三张照片，海滨小镇选择水彩油画，并开启左右对比。
+- `kyoto.jpg` 是 C 原图、默认复古胶片和默认黑白日漫的并排展示。
+- `coast.jpg` 是 D 原图、默认赛璐璐和默认水彩油画的并排展示。
+- `blossoms.jpg` 是 E 原图、默认水彩油画和默认彩铅手绘的并排展示。
+- `styles.jpg` 展示八种风格，分别选用 C、D、E 的实际输出。缩略图为统一网格尺寸进行了裁切，各场景对比图与 PNG 文件保留完整构图。
+- `frames.jpg` 是 C 复古胶片、D 水彩油画、E 彩铅手绘的相框 PNG 成品。三张都选择应用内文案 Postcard from here.。
+- `enhancement.jpg` 使用 D 经浏览器高质量缩小得到的 600 × 400 输入，经实际 LiveAction 生成 1200 × 800 输出，与同一输入的浏览器高质量插值放大比较。两边均截取输出坐标 x=260、y=290、宽 503、高 300 的相同区域，以 1:1 像素显示；不叠加艺术风格。
 
-- `editor.jpg`：网页生产构建的真实浅色界面，导入两张图片，选择水彩油画并开启左右对比。
-- `styles.jpg`：同一张 astronaut 原图在八种风格下的真实 PNG 导出，使用各自默认参数，不开启智能调色或照片增强。
-- `portrait.jpg`：astronaut 原图、默认赛璐璐与默认黑白日漫输出。
-- `pets.jpg`：chelsea 原图、默认彩铅手绘与默认复古胶片输出。
-- `enhancement.jpg`：tests/fixtures/local-v2/low/chelsea-bicubic.png（225 × 150）经 LiveAction 生成 450 × 300 的真实增强底图，未叠加艺术滤镜。左侧输入以最近邻放大，右侧按同等显示尺寸展示。
-- `frames.jpg`：复古胶片人像、彩铅手绘宠物的真实相框 PNG 导出，选择应用内短句 Life lately.。
+排版图只进行缩放、组合与 JPEG 压缩，没有使用生成式图片、局部修补或额外调色来替代软件效果。
 
-画廊仅做等比例排版、缩放和 JPEG 压缩，保留图像内容。网页和 Mac 使用同一套处理管线；展示不构成对所有照片效果或恢复能力的保证。
+## 可直接打开的成品
+
+`samples/` 下三张 PNG 是编辑器直接导出的文件，没有再次压缩或修改：
+
+- [京都 · 黑白日漫](samples/kyoto-manga.png)
+- [海滨小镇 · 水彩油画](samples/coast-watercolor.png)
+- [樱花街道 · 彩铅手绘](samples/blossoms-pencil.png)
+
+这些展示素材与 tests/fixtures 中用于代码回归的测试样片用途独立。README 不再使用宇航员或猫咪测试图作为产品展示。
