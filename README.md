@@ -1,6 +1,7 @@
 <div align="center">
   <img src="desktop/assets/icon.png" width="100" alt="Pixel & Toon Studio 图标">
   <h1>Pixel & Toon Studio</h1>
+  <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
   <p><strong>照片拍好了，再玩一会儿。</strong></p>
   <p>把旅行随拍变成漫画、水彩，或者一张想留下来的小卡片。</p>
   <p>
