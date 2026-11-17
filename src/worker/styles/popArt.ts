@@ -5,11 +5,9 @@ import { sampleBilinear, type StyleContext } from '../shared/sampling';
 /**
  * Bold American pop-art / comic print.
  *
- * Restores the punchy look of the original renderer (per-channel 5-level posterization on a
- * contrast-boosted image, Ben-Day dots that grow in shadows and saturated areas, comic ink
- * edges), with tile-safe, anti-aliased dots and a continuous "色块强度" control.
- * References: Ben-Day / AM halftone screening; posterize + halftone pipelines used by
- * open-source pop-art filters (ImageMagick ordered-dither halftone, GravO8/halftone).
+ * Keeps the punchy per-channel posterized color-clash look, Ben-Day halftone dots,
+ * and comic ink edges of the classic renderer, while applying a light edge-preserving
+ * RGB denoise and soft-threshold quantization to reduce high-frequency speckles.
  */
 export const POP_SCREEN_ANGLE = 0.32;
 export const POP_LEVELS = 5;
@@ -27,6 +25,68 @@ export function popDotCoverage(x: number, y: number, period: number, radius: num
     return 1 - smoothstep(radius - .6, radius + .6, Math.sqrt(dx * dx + dy * dy));
 }
 
+/**
+ * Light separable edge-preserving RGB denoise (radius = 2) to calm sensor grain
+ * and fabric micro-speckles before posterization without blurring real contours.
+ */
+function denoiseRgb(src: Uint8ClampedArray, w: number, h: number, sigma = 22): Uint8ClampedArray {
+    const n = w * h;
+    const tmp = new Float32Array(n * 3);
+    const out = new Uint8ClampedArray(src.length);
+    const invSigma2 = 1 / (sigma * sigma);
+    const spatial = [0.45, 0.78, 1.0, 0.78, 0.45];
+
+    for (let y = 0; y < h; y++) {
+        const row = y * w;
+        for (let x = 0; x < w; x++) {
+            const i = (row + x) * 4;
+            const r0 = src[i], g0 = src[i + 1], b0 = src[i + 2];
+            let sr = 0, sg = 0, sb = 0, sw = 0;
+            for (let k = -2; k <= 2; k++) {
+                const nx = Math.max(0, Math.min(w - 1, x + k));
+                const j = (row + nx) * 4;
+                const dr = src[j] - r0, dg = src[j + 1] - g0, db = src[j + 2] - b0;
+                const d2 = (dr * dr + dg * dg + db * db) * (invSigma2 / 3);
+                const wt = spatial[k + 2] / (1 + d2 * d2);
+                sr += src[j] * wt;
+                sg += src[j + 1] * wt;
+                sb += src[j + 2] * wt;
+                sw += wt;
+            }
+            const t = (row + x) * 3;
+            tmp[t] = sr / sw;
+            tmp[t + 1] = sg / sw;
+            tmp[t + 2] = sb / sw;
+        }
+    }
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const c0 = (y * w + x) * 3;
+            const r0 = tmp[c0], g0 = tmp[c0 + 1], b0 = tmp[c0 + 2];
+            let sr = 0, sg = 0, sb = 0, sw = 0;
+            for (let k = -2; k <= 2; k++) {
+                const ny = Math.max(0, Math.min(h - 1, y + k));
+                const j = (ny * w + x) * 3;
+                const dr = tmp[j] - r0, dg = tmp[j + 1] - g0, db = tmp[j + 2] - b0;
+                const d2 = (dr * dr + dg * dg + db * db) * (invSigma2 / 3);
+                const wt = spatial[k + 2] / (1 + d2 * d2);
+                sr += tmp[j] * wt;
+                sg += tmp[j + 1] * wt;
+                sb += tmp[j + 2] * wt;
+                sw += wt;
+            }
+            const o = (y * w + x) * 4;
+            out[o] = clamp(sr / sw);
+            out[o + 1] = clamp(sg / sw);
+            out[o + 2] = clamp(sb / sw);
+            out[o + 3] = 255;
+        }
+    }
+
+    return out;
+}
+
 export function popArt(
     src: Uint8ClampedArray,
     w: number,
@@ -35,7 +95,6 @@ export function popArt(
     ctx: StyleContext,
     mosaicMask?: Float32Array | null,
 ) {
-    const out = new Uint8ClampedArray(src.length), { lum, sat, grad } = structure(src, w, h);
     const scale = Math.max(1, ctx.scale);
     const period = popDotPeriod(p.dot ?? 6, scale);
     const density = (p.density ?? 45) / 55;
@@ -46,12 +105,27 @@ export function popArt(
     const mix = Math.min(1, poster / .9);
     const contrast = 1 + .24 * mix + .16 * Math.max(0, (poster - .9) / .1);
     const levels = Math.max(2, Math.round(p.levels ?? POP_LEVELS));
+
+    if (poster === 0 && density === 0 && inkStrength === 0 && shift === 0) {
+        const identity = new Uint8ClampedArray(src);
+        for (let i = 3; i < identity.length; i += 4) identity[i] = 255;
+        return identity;
+    }
+
+    const cleanSrc = poster > 0 || inkStrength > 0 ? denoiseRgb(src, w, h, 24) : src;
+    const out = new Uint8ClampedArray(src.length);
+    const { lum, sat, grad } = structure(cleanSrc, w, h);
+
     const step = 255 / (levels - 1);
     const lut = new Float32Array(256);
     for (let v = 0; v < 256; v++) {
         const boosted = clamp((v - 128) * contrast + 128);
-        lut[v] = v + (Math.round(boosted / step) * step - v) * mix;
+        const scaled = boosted / step;
+        const base = Math.floor(scaled);
+        const qv = (base + smoothstep(0.42, 0.58, scaled - base)) * step;
+        lut[v] = v + (qv - v) * mix;
     }
+
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const q = y * w + x, i = q * 4, l = lum[q], s = sat[q];
         const flat = l > 170 && s < .22 && grad[q] < 14;
@@ -60,9 +134,9 @@ export function popArt(
         const spot = gate > 0 ? popDotCoverage(ctx.originX + x, ctx.originY + y, period, radius) * gate : 0;
         const ink = inkStrength > 0 ? inkAt(q, grad, lum, sat, w, h, 55, 80) * inkStrength : 0;
         const localShift = mosaicMask ? shift * (1 - mosaicMask[q]) : shift;
-        const r = localShift ? sampleBilinear(src, w, h, x + localShift, y, 0) : src[i];
-        const b = localShift ? sampleBilinear(src, w, h, x - localShift, y, 2) : src[i + 2];
-        const channels = [r, src[i + 1], b];
+        const r = localShift ? sampleBilinear(cleanSrc, w, h, x + localShift, y, 0) : cleanSrc[i];
+        const b = localShift ? sampleBilinear(cleanSrc, w, h, x - localShift, y, 2) : cleanSrc[i + 2];
+        const channels = [r, cleanSrc[i + 1], b];
         for (let c = 0; c < 3; c++) {
             const v = lut[Math.max(0, Math.min(255, Math.round(channels[c])))];
             out[i + c] = clamp(v * (1 - spot * .6 - ink * .8) + spot * 25 + ink * 8);

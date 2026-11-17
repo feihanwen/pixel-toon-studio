@@ -24,7 +24,10 @@ export function exportHalo(
             styleHalo = Math.max(EXPORT_HALO, Math.ceil(28 * Math.max(1, Math.max(fullWidth, fullHeight) / PENCIL_STYLE_SIDE)));
             break;
         case 'halftone':
-            styleHalo = Math.max(EXPORT_HALO, Math.ceil(Math.max(16, (params.shift ?? 0) + 4) * scale) + 4);
+            styleHalo = Math.max(
+                EXPORT_HALO,
+                Math.ceil((16 + (params.shift ?? 0)) * Math.max(scale, Math.max(fullWidth, fullHeight) / PREVIEW_SIDE)) + 4,
+            );
             break;
         case 'cel':
             styleHalo = Math.max(EXPORT_HALO, Math.ceil(16 * Math.max(1, Math.max(fullWidth, fullHeight) / PREVIEW_SIDE)));

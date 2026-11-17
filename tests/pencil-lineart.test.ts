@@ -4,6 +4,7 @@ import * as ort from 'onnxruntime-web';
 import { defaultParams } from '../src/config/styles';
 import { exportHalo } from '../src/imaging/exportHalo';
 import { PENCIL_LINEART_MODEL } from '../src/pencil/modelManifest';
+import { PencilSketchCache } from '../src/pencil/sketchCache';
 import { render } from '../src/worker/pipeline';
 import { fixture, metrics } from './style-fixtures';
 
@@ -135,5 +136,35 @@ describe('pencil-lineart ONNX integration', () => {
         const diff = metrics(full, stitched);
         expect(diff.mad).toBeLessThan(0.05);
         expect(diff.max).toBeLessThanOrEqual(2);
+    });
+
+    it('caches per-tab pencil sketches across style switches and drops cache on tab close', () => {
+        const cache = new PencilSketchCache(2);
+        const makeEntry = (tabId: string, key: string) => ({
+            key,
+            tabId,
+            width: 8,
+            height: 8,
+            sketchBuffer: new Uint8Array(64).buffer,
+        });
+
+        cache.set(makeEntry('tab-1', 'tab-1:v1'));
+        cache.set(makeEntry('tab-2', 'tab-2:v1'));
+        expect(cache.size).toBe(2);
+
+        // Accessing tab-1 refreshes its MRU position before inserting tab-3
+        expect(cache.get('tab-1:v1')?.tabId).toBe('tab-1');
+        cache.set(makeEntry('tab-3', 'tab-3:v1'));
+        expect(cache.get('tab-2:v1')).toBeNull();
+        expect(cache.get('tab-1:v1')).not.toBeNull();
+
+        // Closing tab-1 drops its cached sketch immediately
+        cache.evictTab('tab-1');
+        expect(cache.get('tab-1:v1')).toBeNull();
+        expect(cache.get('tab-3:v1')).not.toBeNull();
+
+        // Pruning removed tabs drops stale entries
+        cache.pruneTabs(new Set());
+        expect(cache.size).toBe(0);
     });
 });

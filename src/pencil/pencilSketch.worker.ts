@@ -1,18 +1,32 @@
-import * as ort from 'onnxruntime-web/wasm';
+import type { InferenceSession } from 'onnxruntime-web';
 import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
+import gpuWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
 import { digest } from '../enhancement/domain';
+import { selectLocalBackend } from '../enhancement/local/backend';
+import type { LocalBackend } from '../enhancement/local/modelManifest';
 import { PENCIL_LINEART_MODEL, pencilLineartModelUrl } from './modelManifest';
 
-interface PencilSketchRequest {
-    id: number;
-    width: number;
-    height: number;
-    buffer: ArrayBuffer;
-    baseUrl: string;
-}
+type PencilWorkerRequest =
+    | {
+          kind?: 'sketch';
+          id: number;
+          width: number;
+          height: number;
+          buffer: ArrayBuffer;
+          baseUrl: string;
+      }
+    | {
+          kind: 'warmup';
+          id: number;
+          baseUrl: string;
+      };
 
-let session: ort.InferenceSession | null = null;
-let sessionPromise: Promise<ort.InferenceSession> | null = null;
+let session: InferenceSession | null = null;
+let sessionPromise: Promise<{ session: InferenceSession; backend: LocalBackend; ort: typeof import('onnxruntime-web') }> | null = null;
+let loadedOrt: typeof import('onnxruntime-web') | null = null;
+let activeBackend: LocalBackend = 'wasm';
+let gpuDisabled = false;
+let runQueue: Promise<unknown> = Promise.resolve();
 
 async function cachedAsset(url: string): Promise<ArrayBuffer> {
     const absolute = new URL(url, self.location.href).href;
@@ -35,46 +49,84 @@ async function cachedAsset(url: string): Promise<ArrayBuffer> {
     return response.arrayBuffer();
 }
 
-async function ensureSession(baseUrl: string): Promise<ort.InferenceSession> {
-    if (session) return session;
-    if (sessionPromise) return sessionPromise;
+async function ensureSession(
+    baseUrl: string,
+    skipGpu = false,
+): Promise<{ session: InferenceSession; backend: LocalBackend; ort: typeof import('onnxruntime-web') }> {
+    if (session && loadedOrt && (!skipGpu || activeBackend === 'wasm')) {
+        return { session, backend: activeBackend, ort: loadedOrt };
+    }
+    if (sessionPromise && !skipGpu) return sessionPromise;
 
-    sessionPromise = (async () => {
+    const currentPromise = (async () => {
         const modelUrl = pencilLineartModelUrl(baseUrl);
         if (new URL(modelUrl).origin !== self.location.origin) {
             throw new Error('本地模型必须来自本站');
         }
-        const [modelBytes, wasmBytes] = await Promise.all([cachedAsset(modelUrl), cachedAsset(wasmUrl)]);
+        const canUseGpu = !skipGpu && !gpuDisabled && 'gpu' in navigator;
+        const ort = canUseGpu ? await import('onnxruntime-web/all') : await import('onnxruntime-web/wasm');
+        const [modelBytes, wasmBytes] = await Promise.all([
+            cachedAsset(modelUrl),
+            cachedAsset(canUseGpu ? gpuWasmUrl : wasmUrl),
+        ]);
         if (
             modelBytes.byteLength !== PENCIL_LINEART_MODEL.bytes ||
             (await digest(modelBytes)) !== PENCIL_LINEART_MODEL.sha256
         ) {
             throw new Error('彩铅线稿模型校验失败');
         }
-        ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(2, navigator.hardwareConcurrency || 1) : 1;
+        ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
         ort.env.wasm.wasmBinary = wasmBytes;
-        const created = await ort.InferenceSession.create(modelBytes, {
-            executionProviders: ['wasm'],
-            graphOptimizationLevel: 'all',
-        });
-        session = created;
-        return created;
+
+        const engine = await selectLocalBackend(
+            canUseGpu,
+            async selected => {
+                const candidate = await ort.InferenceSession.create(modelBytes, {
+                    executionProviders: [selected],
+                    graphOptimizationLevel: 'all',
+                });
+                try {
+                    // Warm up and verify the selected execution provider can actually run the graph
+                    const warmup = new ort.Tensor('float32', new Float32Array(3 * 16 * 16), [1, 3, 16, 16]);
+                    try {
+                        const out = await candidate.run({ [PENCIL_LINEART_MODEL.inputName]: warmup });
+                        for (const value of Object.values(out)) value.dispose();
+                    } finally {
+                        warmup.dispose();
+                    }
+                    return { backend: selected, release: () => candidate.release(), session: candidate };
+                } catch (error) {
+                    await candidate.release().catch(() => {});
+                    throw error;
+                }
+            },
+            () => {
+                gpuDisabled = true;
+            },
+        );
+
+        session = engine.session;
+        activeBackend = engine.backend;
+        loadedOrt = ort;
+        return { session: engine.session, backend: engine.backend, ort };
     })();
 
+    sessionPromise = currentPromise;
     try {
-        return await sessionPromise;
+        return await currentPromise;
     } catch (error) {
-        sessionPromise = null;
+        if (sessionPromise === currentPromise) {
+            sessionPromise = null;
+        }
         throw error;
     }
 }
 
-async function computeSketch(
-    req: PencilSketchRequest,
-): Promise<{ width: number; height: number; sketchBytes: Uint8Array }> {
-    const { width: w, height: h, baseUrl } = req;
-    const src = new Uint8ClampedArray(req.buffer);
-
+function prepareInput(
+    src: Uint8ClampedArray,
+    w: number,
+    h: number,
+): { aw: number; ah: number; inputData: Float32Array } {
     const scale = Math.min(1, PENCIL_LINEART_MODEL.maxSide / Math.max(w, h));
     const aw = Math.max(8, Math.round((w * scale) / 8) * 8);
     const ah = Math.max(8, Math.round((h * scale) / 8) * 8);
@@ -99,38 +151,80 @@ async function computeSketch(
             for (let c = 0; c < 3; c++) {
                 const top = src[i00 + c] * (1 - wx) + src[i10 + c] * wx;
                 const bot = src[i01 + c] * (1 - wx) + src[i11 + c] * wx;
-                inputData[c * ahw + q] = ((top * (1 - wy) + bot * wy) / 255);
+                inputData[c * ahw + q] = (top * (1 - wy) + bot * wy) / 255;
             }
         }
     }
+    return { aw, ah, inputData };
+}
 
-    const ortSession = await ensureSession(baseUrl);
-    const tensor = new ort.Tensor('float32', inputData, [1, 3, ah, aw]);
-    let outputs: Awaited<ReturnType<ort.InferenceSession['run']>> | undefined;
+async function runInference(
+    inputData: Float32Array,
+    aw: number,
+    ah: number,
+    baseUrl: string,
+    skipGpu = false,
+): Promise<Uint8Array> {
+    const ahw = aw * ah;
+    const engine = await ensureSession(baseUrl, skipGpu);
+    const tensor = new engine.ort.Tensor('float32', inputData, [1, 3, ah, aw]);
+    let outputs: Awaited<ReturnType<InferenceSession['run']>> | undefined;
     try {
-        outputs = await ortSession.run({ [PENCIL_LINEART_MODEL.inputName]: tensor });
+        outputs = await engine.session.run({ [PENCIL_LINEART_MODEL.inputName]: tensor });
         const raw = outputs[PENCIL_LINEART_MODEL.outputName].data as Float32Array;
         const sketchBytes = new Uint8Array(ahw);
         for (let q = 0; q < ahw; q++) {
             sketchBytes[q] = Math.round(Math.max(0, Math.min(1, raw[q])) * 255);
         }
-        return { width: aw, height: ah, sketchBytes };
+        return sketchBytes;
+    } catch (error) {
+        if (engine.backend === 'webgpu' && !skipGpu) {
+            await session?.release().catch(() => {});
+            session = null;
+            sessionPromise = null;
+            gpuDisabled = true;
+            return runInference(inputData, aw, ah, baseUrl, true);
+        }
+        throw error;
     } finally {
         tensor.dispose();
         if (outputs) for (const value of Object.values(outputs)) value.dispose();
     }
 }
 
-self.onmessage = (event: MessageEvent<PencilSketchRequest>) => {
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const next = runQueue.then(task, task);
+    runQueue = next.catch(() => {});
+    return next;
+}
+
+self.onmessage = (event: MessageEvent<PencilWorkerRequest>) => {
     const req = event.data;
-    computeSketch(req)
-        .then(({ width, height, sketchBytes }) => {
+    if (req.kind === 'warmup') {
+        enqueue(() => ensureSession(req.baseUrl))
+            .then(({ backend }) => {
+                self.postMessage({ kind: 'warmed', id: req.id, backend });
+            })
+            .catch(error => {
+                self.postMessage({
+                    kind: 'error',
+                    id: req.id,
+                    message: error instanceof Error ? error.message : '彩铅线稿模型预热失败',
+                });
+            });
+        return;
+    }
+
+    const src = new Uint8ClampedArray(req.buffer);
+    const { aw, ah, inputData } = prepareInput(src, req.width, req.height);
+    enqueue(() => runInference(inputData, aw, ah, req.baseUrl))
+        .then(sketchBytes => {
             self.postMessage(
                 {
                     kind: 'result',
                     id: req.id,
-                    width,
-                    height,
+                    width: aw,
+                    height: ah,
                     sketchBuffer: sketchBytes.buffer,
                 },
                 { transfer: [sketchBytes.buffer] },

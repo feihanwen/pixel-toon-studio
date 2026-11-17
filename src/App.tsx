@@ -30,6 +30,7 @@ import { EnhancementPanel } from './components/EnhancementPanel';
 import { MosaicPanel, type MosaicToolMode } from './components/MosaicPanel';
 import { FaceSegClient } from './mosaic/FaceSegClient';
 import { PencilSketchClient } from './pencil/PencilSketchClient';
+import { PencilSketchCache, type CachedPencilSketch } from './pencil/sketchCache';
 import { defaultMosaic } from './types/mosaic';
 import { autoColorPlan, basePixels, resolveBase } from './enhancement/images';
 import { cancelAllEnhancements, cancelEnhancement, runEnhancement, type EnhancementRequest } from './enhancement/orchestrator';
@@ -101,18 +102,16 @@ function AppContent() {
         maskBuffer: ArrayBuffer;
     } | null>(null);
     const [mosaicFitting, setMosaicFitting] = useState(false);
-    const [pencilSketch, setPencilSketch] = useState<{
-        key: string;
-        width: number;
-        height: number;
-        sketchBuffer: ArrayBuffer;
-    } | null>(null);
+    const [pencilSketch, setPencilSketch] = useState<CachedPencilSketch | null>(null);
     const [pencilSketchLoading, setPencilSketchLoading] = useState(false);
+    const [pencilSketchFailedKey, setPencilSketchFailedKey] = useState('');
 
     const fileInput = useRef<HTMLInputElement>(null);
     const worker = useRef<WorkerClient | null>(null);
     const faceSeg = useRef<FaceSegClient | null>(null);
     const pencilSketchClient = useRef<PencilSketchClient | null>(null);
+    const pencilSketchCache = useRef(new PencilSketchCache(10));
+    const pencilWarmupStarted = useRef(false);
     const revision = useRef(0);
     const draftRef = useRef<Draft | null>(null);
     const recentRandom = useRef<string[]>([]);
@@ -138,9 +137,16 @@ function AppContent() {
             worker.current?.dispose();
             faceSeg.current?.dispose();
             pencilSketchClient.current?.dispose();
+            pencilSketchCache.current.clear();
             cancelAllEnhancements();
         };
     }, []);
+
+    useEffect(() => {
+        const liveIds = new Set(tabs.map(item => item.id));
+        pencilSketchCache.current.pruneTabs(liveIds);
+        setPencilSketch(prev => (prev && !liveIds.has(prev.tabId) ? null : prev));
+    }, [tabs]);
 
     const { ready, saveFailed, markDirty, hasDirty, removeTabFromStorage, flushWorkspace } = useWorkspaceSync({
         tabs,
@@ -281,38 +287,61 @@ function AppContent() {
 
     const pencilSketchKey =
         active && current?.styleId === 'pencil'
-            ? JSON.stringify({ tabId: active.id, sourceKey })
+            ? sourceKey
             : '';
+
+    useEffect(() => {
+        if (pencilWarmupStarted.current || !source || !pencilSketchClient.current) return;
+        const timer = setTimeout(() => {
+            if (pencilWarmupStarted.current || !pencilSketchClient.current) return;
+            pencilWarmupStarted.current = true;
+            pencilSketchClient.current.warmup().catch(() => {
+                // Warmup is best-effort; on-demand inference handles fallback cleanly
+            });
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [source]);
 
     useEffect(() => {
         if (!pencilSketchKey || !source || !active || current?.styleId !== 'pencil' || !pencilSketchClient.current || loadedSourceKey !== sourceKey) {
             if (!pencilSketchKey) {
-                setPencilSketch(null);
                 setPencilSketchLoading(false);
             }
             return;
         }
-        if (pencilSketch?.key === pencilSketchKey) {
+        const cached = pencilSketchCache.current.get(pencilSketchKey);
+        if (cached) {
+            if (pencilSketch?.key !== cached.key) {
+                setPencilSketch(cached);
+            }
+            setPencilSketchFailedKey('');
             setPencilSketchLoading(false);
             return;
         }
         let cancelled = false;
+        setPencilSketchFailedKey('');
         setPencilSketchLoading(true);
+        const tabId = active.id;
         pencilSketchClient.current
             .computeSketch(source.width, source.height, source.data)
             .then(res => {
-                if (cancelled) return;
-                setPencilSketch({
+                const entry: CachedPencilSketch = {
                     key: pencilSketchKey,
+                    tabId,
                     width: res.width,
                     height: res.height,
                     sketchBuffer: res.sketchBuffer,
-                });
+                };
+                pencilSketchCache.current.set(entry);
+                if (cancelled) return;
+                setPencilSketch(entry);
+                setPencilSketchFailedKey('');
                 setPencilSketchLoading(false);
             })
             .catch(() => {
                 if (!cancelled) {
                     setPencilSketch(null);
+                    setPencilSketchFailedKey(pencilSketchKey);
                     setPencilSketchLoading(false);
                 }
             });
@@ -342,7 +371,8 @@ function AppContent() {
         )
             return;
         if (mosaicMaskKey && mosaicFitting && mosaicMask?.key !== mosaicMaskKey) return;
-        if (pencilSketchKey && pencilSketchLoading && pencilSketch?.key !== pencilSketchKey) return;
+        const cachedSketch = pencilSketchKey ? pencilSketchCache.current.get(pencilSketchKey) : null;
+        if (pencilSketchKey && !cachedSketch && pencilSketch?.key !== pencilSketchKey && pencilSketchFailedKey !== pencilSketchKey) return;
         const rev = ++revision.current;
         setProcessing(true);
         const timer = setTimeout(async () => {
@@ -354,7 +384,9 @@ function AppContent() {
                         : null;
                 const readyMask = mosaicMask?.key === mosaicMaskKey ? mosaicMask : null;
                 const readyPencilSketch =
-                    current.styleId === 'pencil' && pencilSketch?.key === pencilSketchKey ? pencilSketch : null;
+                    current.styleId === 'pencil'
+                        ? (pencilSketch?.key === pencilSketchKey ? pencilSketch : pencilSketchCache.current.get(pencilSketchKey))
+                        : null;
                 const response = await worker.current!.render({
                     tabId: active.id,
                     revision: rev,
@@ -417,6 +449,7 @@ function AppContent() {
         pencilSketchKey,
         pencilSketch,
         pencilSketchLoading,
+        pencilSketchFailedKey,
     ]);
 
     useEffect(() => {
@@ -657,6 +690,8 @@ function AppContent() {
             delete n[id];
             return n;
         });
+        pencilSketchCache.current.evictTab(id);
+        setPencilSketch(prev => (prev?.tabId === id ? null : prev));
         removeTabFromStorage(id);
     }
 
@@ -734,10 +769,13 @@ function AppContent() {
                 mosaicMask && mosaicMask.key === mosaicMaskKey
                     ? { width: mosaicMask.width, height: mosaicMask.height, maskBuffer: mosaicMask.maskBuffer }
                     : null;
-            const readyExportPencilSketch =
-                current.styleId === 'pencil' && pencilSketch && pencilSketch.key === pencilSketchKey
-                    ? { width: pencilSketch.width, height: pencilSketch.height, sketchBuffer: pencilSketch.sketchBuffer }
+            const exportSketchSource =
+                current.styleId === 'pencil'
+                    ? (pencilSketch?.key === pencilSketchKey ? pencilSketch : pencilSketchCache.current.get(pencilSketchKey))
                     : null;
+            const readyExportPencilSketch = exportSketchSource
+                ? { width: exportSketchSource.width, height: exportSketchSource.height, sketchBuffer: exportSketchSource.sketchBuffer }
+                : null;
             const blob = await exportPng(
                 exportTab,
                 {

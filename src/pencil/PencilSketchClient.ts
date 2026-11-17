@@ -4,11 +4,19 @@ export interface PencilSketchResult {
     sketchBuffer: ArrayBuffer;
 }
 
-type Pending = {
-    id: number;
-    resolve: (res: PencilSketchResult) => void;
-    reject: (err: Error) => void;
-};
+type Pending =
+    | {
+          kind: 'sketch';
+          id: number;
+          resolve: (res: PencilSketchResult) => void;
+          reject: (err: Error) => void;
+      }
+    | {
+          kind: 'warmup';
+          id: number;
+          resolve: () => void;
+          reject: (err: Error) => void;
+      };
 
 let nextRequestId = 1;
 
@@ -20,6 +28,7 @@ export class PencilSketchClient {
         this.worker.onmessage = (
             event: MessageEvent<
                 | { kind: 'result'; id: number; width: number; height: number; sketchBuffer: ArrayBuffer }
+                | { kind: 'warmed'; id: number }
                 | { kind: 'error'; id: number; message: string }
             >,
         ) => {
@@ -28,7 +37,9 @@ export class PencilSketchClient {
             this.pending.delete(event.data.id);
             if (event.data.kind === 'error') {
                 job.reject(new Error(event.data.message));
-            } else {
+            } else if (event.data.kind === 'warmed') {
+                if (job.kind === 'warmup') job.resolve();
+            } else if (job.kind === 'sketch') {
                 job.resolve({
                     width: event.data.width,
                     height: event.data.height,
@@ -43,13 +54,26 @@ export class PencilSketchClient {
         };
     }
 
+    warmup(): Promise<void> {
+        const id = nextRequestId++;
+        return new Promise((resolve, reject) => {
+            this.pending.set(id, { kind: 'warmup', id, resolve, reject });
+            this.worker.postMessage({
+                kind: 'warmup',
+                id,
+                baseUrl: typeof document !== 'undefined' ? document.baseURI : self.location.href,
+            });
+        });
+    }
+
     computeSketch(width: number, height: number, rgba: Uint8ClampedArray): Promise<PencilSketchResult> {
         const id = nextRequestId++;
         const copy = rgba.slice();
         return new Promise((resolve, reject) => {
-            this.pending.set(id, { id, resolve, reject });
+            this.pending.set(id, { kind: 'sketch', id, resolve, reject });
             this.worker.postMessage(
                 {
+                    kind: 'sketch',
                     id,
                     width,
                     height,
