@@ -22,3 +22,55 @@ for (const directory of ['liveaction-span-x2', 'omnisr-x2', 'realesr-anime-x2', 
     if (manifest.operators && operators.join() !== manifest.operators.join()) throw new Error('ONNX operators do not match manifest');
     console.log(`PASS ${manifest.id}: ${manifest.bytes} bytes, ${manifest.parameters} parameters, SHA-256/I/O/graph verified (${operators.join(', ')})`);
 }
+
+{
+    const root = new URL('../public/models/face-seg-multiclass/', import.meta.url);
+    const manifest = JSON.parse(readFileSync(new URL('model.json', root)));
+    const bytes = readFileSync(new URL(manifest.file, root));
+    const limit = 20000000;
+    if (bytes.length !== manifest.bytes || bytes.length > limit || createHash('sha256').update(bytes).digest('hex') !== manifest.sha256 || statSync(new URL('LICENSE', root)).size < 1000 || !['Apache-2.0', 'MIT', 'BSD-3-Clause'].includes(manifest.license)) {
+        throw new Error('Model asset integrity check failed: face-seg-multiclass');
+    }
+    if (!readFileSync(new URL('../src/mosaic/modelManifest.ts', import.meta.url), 'utf8').includes(manifest.sha256)) {
+        throw new Error('Trusted mosaic manifest does not match model');
+    }
+    const { graph } = schema.decode(bytes);
+    if (graph.input.length !== 1 || graph.output.length !== 1 || graph.input[0].name !== manifest.inputName || graph.output[0].name !== manifest.outputName) {
+        throw new Error('Invalid face-seg ONNX I/O');
+    }
+    const dimensions = graph.input[0].type.tensorType.shape.dim;
+    if (Number(dimensions[1].dimValue) !== manifest.inputSize || Number(dimensions[2].dimValue) !== manifest.inputSize || Number(dimensions[3].dimValue) !== 3) {
+        throw new Error('Invalid face-seg input layout');
+    }
+    const operators = [...new Set(graph.node.map(n => n.opType))].sort();
+    if (manifest.operators && operators.join() !== manifest.operators.join()) {
+        throw new Error('face-seg ONNX operators do not match manifest');
+    }
+    console.log(`PASS ${manifest.id}: ${manifest.bytes} bytes, SHA-256/I/O/graph verified (${operators.join(', ')})`);
+}
+
+{
+    const root = new URL('../public/models/pencil-lineart/', import.meta.url);
+    const manifest = JSON.parse(readFileSync(new URL('model.json', root)));
+    const bytes = readFileSync(new URL(manifest.file, root));
+    const limit = 20000000;
+    if (bytes.length !== manifest.bytes || bytes.length > limit || createHash('sha256').update(bytes).digest('hex') !== manifest.sha256 || statSync(new URL('LICENSE', root)).size < 1000 || !['Apache-2.0', 'MIT', 'BSD-3-Clause'].includes(manifest.license)) {
+        throw new Error('Model asset integrity check failed: pencil-lineart');
+    }
+    if (!readFileSync(new URL('../src/pencil/modelManifest.ts', import.meta.url), 'utf8').includes(manifest.sha256)) {
+        throw new Error('Trusted pencil manifest does not match model');
+    }
+    const { graph } = schema.decode(bytes);
+    if (graph.input.length !== 1 || graph.output.length !== 1 || graph.input[0].name !== manifest.inputName || graph.output[0].name !== manifest.outputName) {
+        throw new Error('Invalid pencil-lineart ONNX I/O');
+    }
+    const dimensions = graph.input[0].type.tensorType.shape.dim;
+    if (Number(dimensions[1].dimValue) !== 3 || !dimensions[2].dimParam || !dimensions[3].dimParam) {
+        throw new Error('Invalid pencil-lineart input layout or static spatial dimensions');
+    }
+    const operators = [...new Set(graph.node.map(n => n.opType))].sort();
+    if (manifest.operators && operators.join() !== manifest.operators.join()) {
+        throw new Error('pencil-lineart ONNX operators do not match manifest');
+    }
+    console.log(`PASS ${manifest.id}: ${manifest.bytes} bytes, SHA-256/I/O/graph verified (${operators.join(', ')})`);
+}

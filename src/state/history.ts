@@ -11,14 +11,23 @@ import {
 } from '../config/captions';
 import type { EditorSnapshot, History } from '../types/document';
 import { defaultEnhancement } from '../types/enhancement';
+import { defaultMosaic, type MosaicSelection, type MosaicStroke } from '../types/mosaic';
 
 export function initialSnapshot(): EditorSnapshot {
     return {
         autoColor: defaultAutoColor(),
         enhancement: defaultEnhancement(),
+        mosaic: defaultMosaic(),
         styleId: 'cel',
         params: defaultParams(),
-        global: { brightness: 0, contrast: 0, saturation: 0 },
+        global: {
+            brightness: 0,
+            contrast: 0,
+            saturation: 0,
+            highlights: 0,
+            shadows: 0,
+            temperature: 0,
+        },
         frameEnabled: false,
         frameStyleId: DEFAULT_FRAME_STYLE_ID,
         showExif: false,
@@ -64,6 +73,9 @@ export function moveHistory(history: History, delta: number): History {
     };
 }
 
+const clampOffset = (value: unknown, lo: number, hi: number) =>
+    Number.isFinite(value) ? Math.max(lo, Math.min(hi, Math.round(value as number))) : 0;
+
 export function normalizeHistory(history: History | undefined, legacyWatercolor = false): History {
     if (!history?.entries?.length) {
         return { entries: [initialSnapshot()], cursor: 0 };
@@ -81,7 +93,7 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
                     value = 0;
                 }
                 if (legacyWatercolor && id === 'watercolor' && Number.isFinite(candidate)) {
-                    if (key === 'radius') value = Math.min(12, value + 1);
+                    if (key === 'radius') value = Math.min(18, value + 1);
                     if (key === 'smear') value = Math.round(Math.sqrt(Math.max(0, value) / 100) * 100);
                     if (key === 'detail') value = Math.round(value * 0.73);
                 }
@@ -96,19 +108,32 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
                 : GLOBAL[key].default;
         }
         const e = raw?.enhancement;
-        const sharpen = Number.isFinite(e?.sharpen) ? Math.max(0, Math.min(100, Math.round(e!.sharpen!))) : 0;
+        const sharpen = clampOffset(e?.sharpen, 0, 100);
+        const clarity = clampOffset(e?.clarity, -50, 100);
+        const denoise = clampOffset(e?.denoise, 0, 100);
         const enhancement = {
             enabled: e?.enabled === true && typeof e.resultId === 'string',
             resultId: typeof e?.resultId === 'string' ? e.resultId : null,
             strength: Number.isFinite(e?.strength) ? Math.max(0, Math.min(100, Math.round(e.strength))) : 70,
             ...(sharpen > 0 ? { sharpen } : {}),
+            ...(clarity !== 0 ? { clarity } : {}),
+            ...(denoise > 0 ? { denoise } : {}),
         };
+        const rawAc = raw?.autoColor;
+        const acExposure = clampOffset(rawAc?.exposure, -50, 50);
+        const acContrast = clampOffset(rawAc?.contrast, -50, 50);
+        const acTemperature = clampOffset(rawAc?.temperature, -50, 50);
+        const acVibrance = clampOffset(rawAc?.vibrance, -50, 50);
         const autoColor = {
-            algorithmVersion: raw?.autoColor?.algorithmVersion === 2 ? (2 as const) : (1 as const),
-            enabled: raw?.autoColor?.enabled === true,
-            strength: Number.isFinite(raw?.autoColor?.strength)
-                ? Math.max(0, Math.min(100, Math.round(raw.autoColor.strength)))
+            algorithmVersion: rawAc?.algorithmVersion === 2 ? (2 as const) : (1 as const),
+            enabled: rawAc?.enabled === true,
+            strength: Number.isFinite(rawAc?.strength)
+                ? Math.max(0, Math.min(100, Math.round(rawAc.strength)))
                 : 70,
+            ...(acExposure !== 0 ? { exposure: acExposure } : {}),
+            ...(acContrast !== 0 ? { contrast: acContrast } : {}),
+            ...(acTemperature !== 0 ? { temperature: acTemperature } : {}),
+            ...(acVibrance !== 0 ? { vibrance: acVibrance } : {}),
         };
         let captionId = CAPTIONS[0].id;
         if (typeof raw?.captionId === 'string' && isKnownCaptionId(raw.captionId)) {
@@ -119,9 +144,40 @@ export function normalizeHistory(history: History | undefined, legacyWatercolor 
         const frameStyleId: FrameStyleId = isKnownFrameStyleId(raw?.frameStyleId)
             ? raw.frameStyleId
             : DEFAULT_FRAME_STYLE_ID;
+        const rawMosaic = raw?.mosaic;
+        const strokes: MosaicStroke[] = Array.isArray(rawMosaic?.strokes)
+            ? rawMosaic.strokes
+                  .filter(
+                      (st): st is MosaicStroke =>
+                          Boolean(st) &&
+                          (st.mode === 'paint' || st.mode === 'erase') &&
+                          Number.isFinite(st.radius) &&
+                          Array.isArray(st.points) &&
+                          st.points.length > 0,
+                  )
+                  .map(st => ({
+                      mode: st.mode,
+                      radius: Math.max(0.005, Math.min(0.3, st.radius)),
+                      points: st.points
+                          .filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+                          .map(p => ({
+                              x: Math.max(0, Math.min(1, p.x)),
+                              y: Math.max(0, Math.min(1, p.y)),
+                          })),
+                  }))
+                  .filter(st => st.points.length > 0)
+            : [];
+        const mosaic: MosaicSelection = {
+            strength: Number.isFinite(rawMosaic?.strength)
+                ? Math.max(0, Math.min(100, Math.round(rawMosaic!.strength)))
+                : 75,
+            aiFaceFit: rawMosaic?.aiFaceFit !== false,
+            strokes,
+        };
         return {
             autoColor,
             enhancement,
+            mosaic,
             styleId,
             params,
             global,

@@ -27,6 +27,10 @@ import { CaptionPickerDialog } from './components/CaptionPickerDialog';
 import { FrameStylePickerDialog } from './components/FrameStylePickerDialog';
 import { LanguageOnboardingDialog } from './components/LanguageOnboardingDialog';
 import { EnhancementPanel } from './components/EnhancementPanel';
+import { MosaicPanel, type MosaicToolMode } from './components/MosaicPanel';
+import { FaceSegClient } from './mosaic/FaceSegClient';
+import { PencilSketchClient } from './pencil/PencilSketchClient';
+import { defaultMosaic } from './types/mosaic';
 import { autoColorPlan, basePixels, resolveBase } from './enhancement/images';
 import { cancelAllEnhancements, cancelEnhancement, runEnhancement, type EnhancementRequest } from './enhancement/orchestrator';
 import { activeTask, type EnhancementTask } from './types/enhancement';
@@ -66,6 +70,7 @@ function AppContent() {
     const t = uiText(language);
     const [enhancementTasks, setEnhancementTasks] = useState<Record<string, EnhancementTask>>({});
     const [loadedSourceKey, setLoadedSourceKey] = useState('');
+    const [loadedColorKey, setLoadedColorKey] = useState('');
     const [colorPlan, setColorPlan] = useState<AutoColorPlan | null>(null);
     const [outputSize, setOutputSize] = useState<{ width: number; height: number }>();
     const [tabs, setTabs] = useState<PhotoTab[]>([]);
@@ -86,9 +91,28 @@ function AppContent() {
     const [original, setOriginal] = useState<HTMLCanvasElement | null>(null);
     const [processed, setProcessed] = useState<HTMLCanvasElement | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
+    const [mosaicTool, setMosaicTool] = useState<MosaicToolMode>(null);
+    const [mosaicBrushSize, setMosaicBrushSize] = useState(36);
+    const [mosaicMask, setMosaicMask] = useState<{
+        key: string;
+        width: number;
+        height: number;
+        matchedFaces: number;
+        maskBuffer: ArrayBuffer;
+    } | null>(null);
+    const [mosaicFitting, setMosaicFitting] = useState(false);
+    const [pencilSketch, setPencilSketch] = useState<{
+        key: string;
+        width: number;
+        height: number;
+        sketchBuffer: ArrayBuffer;
+    } | null>(null);
+    const [pencilSketchLoading, setPencilSketchLoading] = useState(false);
 
     const fileInput = useRef<HTMLInputElement>(null);
     const worker = useRef<WorkerClient | null>(null);
+    const faceSeg = useRef<FaceSegClient | null>(null);
+    const pencilSketchClient = useRef<PencilSketchClient | null>(null);
     const revision = useRef(0);
     const draftRef = useRef<Draft | null>(null);
     const recentRandom = useRef<string[]>([]);
@@ -108,8 +132,12 @@ function AppContent() {
 
     useEffect(() => {
         worker.current = new WorkerClient();
+        faceSeg.current = new FaceSegClient();
+        pencilSketchClient.current = new PencilSketchClient();
         return () => {
             worker.current?.dispose();
+            faceSeg.current?.dispose();
+            pencilSketchClient.current?.dispose();
             cancelAllEnhancements();
         };
     }, []);
@@ -154,21 +182,19 @@ function AppContent() {
         };
     }, [active?.id]);
 
-    const enhancementKey = JSON.stringify({
-        enhancement: current?.enhancement,
-        autoColor: current?.autoColor,
-    });
+    const enhancementKey = JSON.stringify(current?.enhancement ?? null);
+    const autoColorKey = JSON.stringify(current?.autoColor ?? null);
     const sourceKey = active ? `${active.id}:${enhancementKey}` : '';
+    const colorKey = active ? `${active.id}:${enhancementKey}:${autoColorKey}` : '';
 
     useEffect(() => {
         if (!active || !current) return;
         let cancelled = false;
         revision.current++;
         setProcessing(true);
-        Promise.all([basePixels(active, current, PREVIEW_SIDE), resolveBase(active, current), autoColorPlan(active, current)])
-            .then(([pixels, base, plan]) => {
+        Promise.all([basePixels(active, current, PREVIEW_SIDE), resolveBase(active, current)])
+            .then(([pixels, base]) => {
                 if (!cancelled) {
-                    setColorPlan(plan);
                     setLoadedSourceKey(sourceKey);
                     setSource(pixels);
                     setOutputSize({ width: base.width, height: base.height });
@@ -187,21 +213,148 @@ function AppContent() {
         };
     }, [active?.id, enhancementKey]);
 
+    useEffect(() => {
+        if (!active || !current) return;
+        let cancelled = false;
+        autoColorPlan(active, current)
+            .then(plan => {
+                if (!cancelled) {
+                    setColorPlan(plan);
+                    setLoadedColorKey(colorKey);
+                }
+            })
+            .catch(error => {
+                if (!cancelled) {
+                    setNotice(error.message);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [active?.id, enhancementKey, autoColorKey]);
+
+    const mosaicMaskKey =
+        active && current?.mosaic && current.mosaic.strokes.length > 0
+            ? JSON.stringify({
+                  tabId: active.id,
+                  sourceKey,
+                  strokes: current.mosaic.strokes,
+                  aiFaceFit: current.mosaic.aiFaceFit,
+              })
+            : '';
+
+    useEffect(() => {
+        setMosaicTool(null);
+    }, [active?.id]);
+
+    useEffect(() => {
+        if (!mosaicMaskKey || !source || !active || !current?.mosaic || !faceSeg.current || loadedSourceKey !== sourceKey) {
+            setMosaicMask(null);
+            setMosaicFitting(false);
+            return;
+        }
+        let cancelled = false;
+        setMosaicFitting(true);
+        faceSeg.current
+            .computeMask(source.width, source.height, source.data, current.mosaic.strokes, current.mosaic.aiFaceFit)
+            .then(res => {
+                if (cancelled) return;
+                setMosaicMask({
+                    key: mosaicMaskKey,
+                    width: res.width,
+                    height: res.height,
+                    matchedFaces: res.matchedFaces,
+                    maskBuffer: res.maskBuffer,
+                });
+                setMosaicFitting(false);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setMosaicMask(null);
+                    setMosaicFitting(false);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [mosaicMaskKey, source, loadedSourceKey, sourceKey]);
+
+    const pencilSketchKey =
+        active && current?.styleId === 'pencil'
+            ? JSON.stringify({ tabId: active.id, sourceKey })
+            : '';
+
+    useEffect(() => {
+        if (!pencilSketchKey || !source || !active || current?.styleId !== 'pencil' || !pencilSketchClient.current || loadedSourceKey !== sourceKey) {
+            if (!pencilSketchKey) {
+                setPencilSketch(null);
+                setPencilSketchLoading(false);
+            }
+            return;
+        }
+        if (pencilSketch?.key === pencilSketchKey) {
+            setPencilSketchLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setPencilSketchLoading(true);
+        pencilSketchClient.current
+            .computeSketch(source.width, source.height, source.data)
+            .then(res => {
+                if (cancelled) return;
+                setPencilSketch({
+                    key: pencilSketchKey,
+                    width: res.width,
+                    height: res.height,
+                    sketchBuffer: res.sketchBuffer,
+                });
+                setPencilSketchLoading(false);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setPencilSketch(null);
+                    setPencilSketchLoading(false);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [pencilSketchKey, source, loadedSourceKey, sourceKey]);
+
     const renderKey = current
         ? JSON.stringify({
               styleId: current.styleId,
               params: current.params[current.styleId],
               global: current.global,
+              mosaicStrength: current.mosaic?.strength ?? 75,
+              mosaicMaskKey,
           })
         : '';
 
     useEffect(() => {
-        if (!source || !active || !current || !worker.current || loadedSourceKey !== sourceKey) return;
+        if (
+            !source ||
+            !active ||
+            !current ||
+            !worker.current ||
+            loadedSourceKey !== sourceKey ||
+            loadedColorKey !== colorKey
+        )
+            return;
+        if (mosaicMaskKey && mosaicFitting && mosaicMask?.key !== mosaicMaskKey) return;
+        if (pencilSketchKey && pencilSketchLoading && pencilSketch?.key !== pencilSketchKey) return;
         const rev = ++revision.current;
         setProcessing(true);
         const timer = setTimeout(async () => {
             try {
                 const bytes = new Uint8ClampedArray(source.data);
+                const activeMosaic =
+                    current.mosaic && current.mosaic.strength > 0 && current.mosaic.strokes.length > 0
+                        ? current.mosaic
+                        : null;
+                const readyMask = mosaicMask?.key === mosaicMaskKey ? mosaicMask : null;
+                const readyPencilSketch =
+                    current.styleId === 'pencil' && pencilSketch?.key === pencilSketchKey ? pencilSketch : null;
                 const response = await worker.current!.render({
                     tabId: active.id,
                     revision: rev,
@@ -217,6 +370,22 @@ function AppContent() {
                     params: current.params[current.styleId],
                     global: current.global,
                     autoColor: colorPlan,
+                    mosaic: activeMosaic
+                        ? {
+                              strength: activeMosaic.strength,
+                              maskWidth: readyMask?.width ?? 0,
+                              maskHeight: readyMask?.height ?? 0,
+                              maskBuffer: readyMask ? readyMask.maskBuffer.slice(0) : undefined,
+                              strokes: readyMask ? undefined : activeMosaic.strokes,
+                          }
+                        : undefined,
+                    pencilSketch: readyPencilSketch
+                        ? {
+                              width: readyPencilSketch.width,
+                              height: readyPencilSketch.height,
+                              sketchBuffer: readyPencilSketch.sketchBuffer.slice(0),
+                          }
+                        : undefined,
                     buffer: bytes.buffer,
                 });
                 if (rev !== revision.current) return;
@@ -233,7 +402,22 @@ function AppContent() {
             }
         }, 70);
         return () => clearTimeout(timer);
-    }, [source, active?.id, renderKey, colorPlan, loadedSourceKey, sourceKey]);
+    }, [
+        source,
+        active?.id,
+        renderKey,
+        colorPlan,
+        loadedSourceKey,
+        sourceKey,
+        loadedColorKey,
+        colorKey,
+        mosaicMaskKey,
+        mosaicMask,
+        mosaicFitting,
+        pencilSketchKey,
+        pencilSketch,
+        pencilSketchLoading,
+    ]);
 
     useEffect(() => {
         if (!active || !current || !current.frameEnabled || !current.showExif || !active.exifConsent) {
@@ -294,6 +478,8 @@ function AppContent() {
     function undo(delta: number) {
         if (!active) return;
         finishDraft();
+        setCaptionPicker(null);
+        setFrameStylePicker(null);
         markDirty(active.id);
         setTabs(prev =>
             prev.map(item => (item.id === active.id ? { ...item, history: moveHistory(item.history, delta) } : item)),
@@ -544,6 +730,14 @@ function AppContent() {
         setExporting(true);
         setExportProgress('0%');
         try {
+            const readyExportMask =
+                mosaicMask && mosaicMask.key === mosaicMaskKey
+                    ? { width: mosaicMask.width, height: mosaicMask.height, maskBuffer: mosaicMask.maskBuffer }
+                    : null;
+            const readyExportPencilSketch =
+                current.styleId === 'pencil' && pencilSketch && pencilSketch.key === pencilSketchKey
+                    ? { width: pencilSketch.width, height: pencilSketch.height, sketchBuffer: pencilSketch.sketchBuffer }
+                    : null;
             const blob = await exportPng(
                 exportTab,
                 {
@@ -553,6 +747,8 @@ function AppContent() {
                     showExif: current.showExif,
                 },
                 (done, total) => setExportProgress(`${Math.round((done / total) * 100)}%`),
+                readyExportMask,
+                readyExportPencilSketch,
             );
             const saved = await download(
                 blob,
@@ -698,6 +894,15 @@ function AppContent() {
                                     content={content}
                                     showOriginal={showOriginal}
                                     processing={processing}
+                                    mosaicTool={mosaicTool}
+                                    mosaicBrushSize={mosaicBrushSize}
+                                    onMosaicStroke={stroke =>
+                                        commitEdit(s => {
+                                            const m = s.mosaic ?? defaultMosaic();
+                                            const nextStrokes = [...m.strokes, stroke];
+                                            return { ...s, mosaic: { ...m, strokes: nextStrokes } };
+                                        })
+                                    }
                                 />
                             ) : (
                                 <div className="loading-stage">{t.loadingPhoto}</div>
@@ -754,11 +959,35 @@ function AppContent() {
                     tabCount={tabs.length}
                     snapshot={current}
                     outputSize={outputSize}
+                    pickerPanel={
+                        frameStylePicker && frameStylePicker.tabId === activeId ? (
+                            <FrameStylePickerDialog
+                                selectedId={frameStylePicker.previewId}
+                                photoWidth={outputSize?.width ?? active?.width}
+                                photoHeight={outputSize?.height ?? active?.height}
+                                onPreview={id =>
+                                    setFrameStylePicker(prev => (prev ? { ...prev, previewId: id } : prev))
+                                }
+                                onConfirm={confirmFrameStylePicker}
+                                onCancel={() => setFrameStylePicker(null)}
+                                onRandom={pickFrameStyle}
+                            />
+                        ) : captionPicker && captionPicker.tabId === activeId ? (
+                            <CaptionPickerDialog
+                                selectedId={captionPicker.previewId}
+                                onPreview={id => setCaptionPicker(prev => (prev ? { ...prev, previewId: id } : prev))}
+                                onConfirm={confirmCaptionPicker}
+                                onCancel={() => setCaptionPicker(null)}
+                                onRandom={pickCaption}
+                            />
+                        ) : null
+                    }
                     enhancementPanel={
                         active && current ? (
                             <>
                                 <AutoColorPanel
                                     selection={current.autoColor}
+                                    diagnostics={colorPlan?.diagnostics}
                                     onUpgrade={() =>
                                         commitEdit(s => ({
                                             ...s,
@@ -774,6 +1003,22 @@ function AppContent() {
                                     onStrength={strength =>
                                         changeDraft(s => {
                                             s.autoColor.strength = strength;
+                                        })
+                                    }
+                                    onOffset={(key, value) =>
+                                        changeDraft(s => {
+                                            if (value === 0) delete s.autoColor[key];
+                                            else s.autoColor[key] = value;
+                                        })
+                                    }
+                                    onResetTuning={() =>
+                                        commitEdit(s => {
+                                            const next = { ...s.autoColor };
+                                            delete next.exposure;
+                                            delete next.contrast;
+                                            delete next.temperature;
+                                            delete next.vibrance;
+                                            return { ...s, autoColor: next };
                                         })
                                     }
                                     onCommit={finishDraft}
@@ -803,9 +1048,79 @@ function AppContent() {
                                             else delete s.enhancement.sharpen;
                                         })
                                     }
+                                    onClarity={clarity =>
+                                        changeDraft(s => {
+                                            if (clarity !== 0) s.enhancement.clarity = clarity;
+                                            else delete s.enhancement.clarity;
+                                        })
+                                    }
+                                    onDenoise={denoise =>
+                                        changeDraft(s => {
+                                            if (denoise > 0) s.enhancement.denoise = denoise;
+                                            else delete s.enhancement.denoise;
+                                        })
+                                    }
+                                    onPreset={preset =>
+                                        commitEdit(s => {
+                                            const next = { ...s.enhancement, strength: preset.strength };
+                                            if (preset.sharpen > 0) next.sharpen = preset.sharpen;
+                                            else delete next.sharpen;
+                                            if (preset.clarity !== 0) next.clarity = preset.clarity;
+                                            else delete next.clarity;
+                                            if (preset.denoise > 0) next.denoise = preset.denoise;
+                                            else delete next.denoise;
+                                            return { ...s, enhancement: next };
+                                        })
+                                    }
                                     onCommit={finishDraft}
                                 />
                             </>
+                        ) : null
+                    }
+                    mosaicPanel={
+                        active && current ? (
+                            <MosaicPanel
+                                mosaic={current.mosaic ?? defaultMosaic()}
+                                tool={mosaicTool}
+                                brushSize={mosaicBrushSize}
+                                fitting={mosaicFitting}
+                                matchedFaces={mosaicMask?.key === mosaicMaskKey ? mosaicMask.matchedFaces : 0}
+                                onToolChange={setMosaicTool}
+                                onBrushSizeChange={setMosaicBrushSize}
+                                onStrengthChange={strength =>
+                                    changeDraft(s => {
+                                        s.mosaic = { ...(s.mosaic ?? defaultMosaic()), strength };
+                                    })
+                                }
+                                onCommitStrength={finishDraft}
+                                onResetStrength={() =>
+                                    commitEdit(s => ({
+                                        ...s,
+                                        mosaic: { ...(s.mosaic ?? defaultMosaic()), strength: 75 },
+                                    }))
+                                }
+                                onAiFaceFitChange={aiFaceFit =>
+                                    commitEdit(s => ({
+                                        ...s,
+                                        mosaic: { ...(s.mosaic ?? defaultMosaic()), aiFaceFit },
+                                    }))
+                                }
+                                onUndoStroke={() =>
+                                    commitEdit(s => {
+                                        const m = s.mosaic ?? defaultMosaic();
+                                        const nextStrokes = m.strokes.slice(0, -1);
+                                        if (!nextStrokes.length && mosaicTool === 'erase') setMosaicTool('paint');
+                                        return { ...s, mosaic: { ...m, strokes: nextStrokes } };
+                                    })
+                                }
+                                onClearAll={() => {
+                                    setMosaicTool(null);
+                                    commitEdit(s => ({
+                                        ...s,
+                                        mosaic: { ...(s.mosaic ?? defaultMosaic()), strokes: [] },
+                                    }));
+                                }}
+                            />
                         ) : null
                     }
                     exif={active ? (exifData[active.id] ?? null) : null}
@@ -885,26 +1200,6 @@ function AppContent() {
                         <span>HEIC · PNG · JPEG · WebP</span>
                     </div>
                 </div>
-            )}
-            {frameStylePicker && frameStylePicker.tabId === activeId && (
-                <FrameStylePickerDialog
-                    selectedId={frameStylePicker.previewId}
-                    photoWidth={outputSize?.width ?? active?.width}
-                    photoHeight={outputSize?.height ?? active?.height}
-                    onPreview={id => setFrameStylePicker(prev => (prev ? { ...prev, previewId: id } : prev))}
-                    onConfirm={confirmFrameStylePicker}
-                    onCancel={() => setFrameStylePicker(null)}
-                    onRandom={pickFrameStyle}
-                />
-            )}
-            {captionPicker && captionPicker.tabId === activeId && (
-                <CaptionPickerDialog
-                    selectedId={captionPicker.previewId}
-                    onPreview={id => setCaptionPicker(prev => (prev ? { ...prev, previewId: id } : prev))}
-                    onConfirm={confirmCaptionPicker}
-                    onCancel={() => setCaptionPicker(null)}
-                    onRandom={pickCaption}
-                />
             )}
             {showLanguageOnboarding && (
                 <LanguageOnboardingDialog onClose={() => setShowLanguageOnboarding(false)} />

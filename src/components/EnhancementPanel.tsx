@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PhotoTab, EditorSnapshot } from '../types/document';
-import { activeTask, enhancementSharpen, type EnhancementResult, type EnhancementTask } from '../types/enhancement';
+import {
+    activeTask,
+    enhancementClarity,
+    enhancementDenoise,
+    enhancementSharpen,
+    type EnhancementBackendMode,
+    type EnhancementResult,
+    type EnhancementTask,
+} from '../types/enhancement';
 import { cleanResults, getResult } from '../storage/enhancementStore';
 import type { EnhancementRequest } from '../enhancement/orchestrator';
 import { ParameterSlider } from './ParameterSlider';
@@ -21,6 +29,9 @@ interface Props {
     onEnable: (value: boolean) => void;
     onStrength: (value: number) => void;
     onSharpen: (value: number) => void;
+    onClarity: (value: number) => void;
+    onDenoise: (value: number) => void;
+    onPreset: (preset: { strength: number; sharpen: number; clarity: number; denoise: number }) => void;
     onCommit: () => void;
 }
 
@@ -31,11 +42,19 @@ const profileLabels: Record<LocalProfile, string> = {
     denoise: 'NAFNet',
 };
 
+const ENHANCEMENT_PRESETS = [
+    { id: 'balanced', strength: 100, sharpen: 25, clarity: 0, denoise: 0 },
+    { id: 'crisp', strength: 100, sharpen: 55, clarity: 35, denoise: 0 },
+    { id: 'soft', strength: 78, sharpen: 10, clarity: -24, denoise: 28 },
+    { id: 'clean', strength: 92, sharpen: 20, clarity: 10, denoise: 50 },
+] as const;
+
 export function EnhancementPanel(props: Props) {
     const { language } = usePreferences();
     const t = uiText(language);
     const choices = ENHANCEMENT_CHOICES[language];
     const [profile, setProfile] = useState<LocalProfile>('liveaction');
+    const [backendMode, setBackendMode] = useState<EnhancementBackendMode>('auto');
     const chosen = useRef(false);
     const [cached, setCached] = useState(false);
     const [message, setMessage] = useState('');
@@ -44,6 +63,8 @@ export function EnhancementPanel(props: Props) {
     const busy = activeTask(props.task);
     const selection = props.snapshot.enhancement;
     const sharpen = enhancementSharpen(selection);
+    const clarity = enhancementClarity(selection);
+    const denoise = enhancementDenoise(selection);
     const currentName =
         result?.modelId === 'ffdnet-color'
             ? 'FFDNet'
@@ -89,6 +110,12 @@ export function EnhancementPanel(props: Props) {
               : t.enhanceDoneSaved
           : props.task?.message;
     const sameModel = result?.localProfile === profile && result?.modelId === model.id;
+    const presetLabels = {
+        balanced: t.enhancePresetBalanced,
+        crisp: t.enhancePresetCrisp,
+        soft: t.enhancePresetSoft,
+        clean: t.enhancePresetClean,
+    };
 
     return (
         <details className="enhancement-panel control-section">
@@ -141,7 +168,7 @@ export function EnhancementPanel(props: Props) {
                     <button
                         className="enhance-start"
                         disabled={busy}
-                        onClick={() => props.onRun({ localProfile: profile, force: sameModel })}
+                        onClick={() => props.onRun({ localProfile: profile, force: sameModel, backendMode })}
                     >
                         {busy ? t.enhanceRunningBtn : sameModel ? t.enhanceRegenerateBtn : t.enhanceStartBtn}
                     </button>
@@ -166,7 +193,11 @@ export function EnhancementPanel(props: Props) {
                                 <strong>{t.applyEnhanceToggle}</strong>
                                 <small>
                                     {result
-                                        ? `${currentName} · ${result.width} × ${result.height}`
+                                        ? `${currentName} · ${result.width} × ${result.height}${
+                                              result.executionBackend
+                                                  ? ` · ${result.executionBackend === 'webgpu' ? 'GPU' : 'WASM'}`
+                                                  : ''
+                                          }`
                                         : t.enhanceMissingResult}
                                 </small>
                             </span>
@@ -201,12 +232,34 @@ export function EnhancementPanel(props: Props) {
                 )}
                 {selection.resultId && (
                     <div className="enhance-sliders">
+                        <div className="tune-head">
+                            <span>{t.enhancePresetsLabel}</span>
+                        </div>
+                        <div className="preset-pills" role="group" aria-label={t.enhancePresetsLabel}>
+                            {ENHANCEMENT_PRESETS.map(preset => {
+                                const active =
+                                    selection.strength === preset.strength &&
+                                    sharpen === preset.sharpen &&
+                                    clarity === preset.clarity &&
+                                    denoise === preset.denoise;
+                                return (
+                                    <button
+                                        key={preset.id}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => props.onPreset(preset)}
+                                    >
+                                        {presetLabels[preset.id]}
+                                    </button>
+                                );
+                            })}
+                        </div>
                         <ParameterSlider
                             label={t.blendStrengthLabel}
                             value={selection.strength}
                             min={0}
                             max={100}
-                            unit=""
+                            unit="%"
                             defaultValue={100}
                             onChange={props.onStrength}
                             onCommit={props.onCommit}
@@ -220,7 +273,7 @@ export function EnhancementPanel(props: Props) {
                             value={sharpen}
                             min={0}
                             max={100}
-                            unit=""
+                            unit="%"
                             defaultValue={25}
                             onChange={props.onSharpen}
                             onCommit={props.onCommit}
@@ -229,10 +282,59 @@ export function EnhancementPanel(props: Props) {
                                 props.onCommit();
                             }}
                         />
+                        <ParameterSlider
+                            label={t.enhanceClarityLabel}
+                            value={clarity}
+                            min={-50}
+                            max={100}
+                            unit=""
+                            defaultValue={0}
+                            onChange={props.onClarity}
+                            onCommit={props.onCommit}
+                            onReset={() => {
+                                props.onClarity(0);
+                                props.onCommit();
+                            }}
+                        />
+                        <ParameterSlider
+                            label={t.enhanceDenoiseLabel}
+                            value={denoise}
+                            min={0}
+                            max={100}
+                            unit="%"
+                            defaultValue={0}
+                            onChange={props.onDenoise}
+                            onCommit={props.onCommit}
+                            onReset={() => {
+                                props.onDenoise(0);
+                                props.onCommit();
+                            }}
+                        />
                     </div>
                 )}
                 <details className="enhance-settings">
                     <summary>{t.moreSettingsSummary}</summary>
+                    <div className="backend-row">
+                        <span>{t.enhanceBackendLabel}</span>
+                        <div className="backend-pills" role="group" aria-label={t.enhanceBackendLabel}>
+                            <button
+                                type="button"
+                                disabled={busy}
+                                aria-pressed={backendMode === 'auto'}
+                                onClick={() => setBackendMode('auto')}
+                            >
+                                {t.enhanceBackendAuto}
+                            </button>
+                            <button
+                                type="button"
+                                disabled={busy}
+                                aria-pressed={backendMode === 'wasm'}
+                                onClick={() => setBackendMode('wasm')}
+                            >
+                                {t.enhanceBackendWasm}
+                            </button>
+                        </div>
+                    </div>
                     <p className="enhance-help">
                         {t.enhanceHelpLine1(model.maxInputPixels / 1000000)}
                         <br />

@@ -4,7 +4,17 @@
 .control-section[open] > summary::after { transform: rotate(180deg); }
 .control-section > summary small { flex: 1; text-align: right; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; font-weight: 400; }
 .auto-color-body { margin-top: 16px; }
-.auto-color-body > .parameter { margin-top: 20px; }
+.auto-color-body > .parameter { margin-top: 18px; }
+.preset-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.preset-pills button { border: 1px solid var(--glass-border); border-radius: 14px; background: var(--glass); color: var(--secondary); padding: 6px 10px; font-size: 11px; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.preset-pills button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent-border); color: var(--text); font-weight: 600; }
+.diag-note { margin: 12px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--glass); border: 1px solid var(--glass-border); font-size: 10px; color: var(--secondary); line-height: 1.5; }
+.tune-head { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 11px; color: var(--secondary); }
+.tune-head button { border: 0; background: transparent; color: var(--accent); font-size: 10px; padding: 2px 4px; cursor: pointer; }
+.backend-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 11px; color: var(--secondary); }
+.backend-pills { display: flex; gap: 6px; }
+.backend-pills button { border: 1px solid var(--glass-border); border-radius: 12px; background: var(--glass); color: var(--secondary); padding: 5px 9px; font-size: 10px; cursor: pointer; }
+.backend-pills button[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent-border); color: var(--text); font-weight: 600; }
 .enhancement-body { margin-top: 16px; }
 .enhance-model-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .enhance-model-picker button { border: 1px solid var(--glass-border); border-radius: 15px; background: var(--glass); color: var(--secondary); padding: 12px; text-align: left; }

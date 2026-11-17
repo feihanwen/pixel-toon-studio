@@ -36,13 +36,11 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
     );
     const lastPresetId = useRef<string>(isCustomCaptionId(selectedId) ? CAPTIONS[0].id : selectedId);
     const dialog = useRef<HTMLDivElement>(null);
-    const previousFocus = useRef<HTMLElement | null>(null);
     const options = useMemo(() => filterCaptions({ language, theme }), [language, theme]);
 
     useEffect(() => {
-        previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         dialog.current?.querySelector<HTMLElement>('button')?.focus();
-        return () => previousFocus.current?.focus();
+        dialog.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
     }, []);
 
     function selectPreset(id: string) {
@@ -65,38 +63,17 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
         if (event.key === 'Escape') {
             event.preventDefault();
             onCancel();
-            return;
-        }
-        if (event.key !== 'Tab' || !dialog.current) return;
-        const focusable = Array.from(
-            dialog.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)'),
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last?.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first?.focus();
         }
     }
 
     return (
         <div
-            className="modal-backdrop caption-backdrop"
-            onMouseDown={event => {
-                if (event.target === event.currentTarget) onCancel();
-            }}
+            ref={dialog}
+            className="inline-picker caption-picker"
+            role="region"
+            aria-labelledby="caption-title"
+            onKeyDown={keyDown}
         >
-            <div
-                ref={dialog}
-                className="caption-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="caption-title"
-                onKeyDown={keyDown}
-            >
                 <div className="caption-dialog-heading">
                     <div>
                         <span className="eyebrow">FRAME CAPTION</span>
@@ -185,6 +162,5 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                     </div>
                 </div>
             </div>
-        </div>
     );
 }

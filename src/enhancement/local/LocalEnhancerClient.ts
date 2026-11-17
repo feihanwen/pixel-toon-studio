@@ -33,7 +33,7 @@ export async function isLocalModelCached(profile: LocalProfile) {
 }
 export interface LocalOutput { blob: Blob; width: number; height: number; backend: LocalBackend; modelId: string }
 class RetryWasmError extends Error {}
-export async function enhanceLocal(blob: Blob, signal: AbortSignal, onProgress: (progress: number, message: string) => void, profile: LocalProfile = 'liveaction'): Promise<LocalOutput> {
+export async function enhanceLocal(blob: Blob, signal: AbortSignal, onProgress: (progress: number, message: string) => void, profile: LocalProfile = 'liveaction', forceWasm = false): Promise<LocalOutput> {
     signal.throwIfAborted();
     const model = localModel(profile);
     const image = await decode(blob);
@@ -61,7 +61,7 @@ export async function enhanceLocal(blob: Blob, signal: AbortSignal, onProgress: 
                 if (event.data.kind === 'error') { finish(); reject(event.data.retryWasm ? new RetryWasmError(event.data.message) : new Error(event.data.message)); }
             };
             worker.onerror = () => { finish(); reject(new Error('本地推理 Worker 运行失败，请重试')); };
-            worker.postMessage({ id: 1, width: pixels.width, height: pixels.height, buffer: pixels.data.buffer, profile, baseUrl: document.baseURI, skipGpu: failedGpu.has(profile) }, [pixels.data.buffer]);
+            worker.postMessage({ id: 1, width: pixels.width, height: pixels.height, buffer: pixels.data.buffer, profile, baseUrl: document.baseURI, skipGpu: forceWasm || failedGpu.has(profile) }, [pixels.data.buffer]);
         });
     } catch (error) {
         if (!(error instanceof RetryWasmError)) throw error;
@@ -69,7 +69,7 @@ export async function enhanceLocal(blob: Blob, signal: AbortSignal, onProgress: 
         onProgress(0, '设备加速失败，正在重新启动本机兼容模式，可能较慢…');
         signal.throwIfAborted();
         // A fresh Worker also recovers from unrecoverable ORT init/device state.
-        return await enhanceLocal(blob, signal, onProgress, profile);
+        return await enhanceLocal(blob, signal, onProgress, profile, true);
     } finally { if (succeeded) releaseWorker(worker, profile); else worker.terminate(); }
 }
 

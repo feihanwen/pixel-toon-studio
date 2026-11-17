@@ -1,5 +1,6 @@
 import { popArt } from './styles/popArt';
 import { applyAutoColor } from '../imaging/autoColor';
+import { applyPostStyleChromaGuard, applyPreStyleMosaic, resolveTileMosaicMask } from '../mosaic/mosaicEngine';
 import type { RenderRequest } from '../types/worker';
 import { adjust } from './shared/color';
 import { cel } from './styles/cel';
@@ -14,12 +15,26 @@ export function render(req: RenderRequest): ArrayBuffer {
     const src = new Uint8ClampedArray(req.buffer);
     let out: Uint8ClampedArray;
     applyAutoColor(src, req.autoColor);
+    const mosaicMask = resolveTileMosaicMask(req, src);
+    if (mosaicMask && req.mosaic) {
+        applyPreStyleMosaic(
+            src,
+            req.width,
+            req.height,
+            mosaicMask,
+            req.mosaic.strength,
+            req.originX,
+            req.originY,
+            req.fullWidth,
+            req.fullHeight,
+        );
+    }
     if (req.output === 'base') {
         return src.buffer as ArrayBuffer;
     }
     switch (req.styleId) {
         case 'cel':
-            out = cel(src, req.width, req.height, req.params);
+            out = cel(src, req.width, req.height, req.params, req);
             break;
         case 'pixel':
             out = pixel(src, req.width, req.height, req.params, req.originX, req.originY, req.scale);
@@ -28,7 +43,7 @@ export function render(req: RenderRequest): ArrayBuffer {
             out = watercolor(src, req.width, req.height, req.params, req.originX, req.originY, req.fullWidth, req.fullHeight);
             break;
         case 'halftone':
-            out = popArt(src, req.width, req.height, req.params, req);
+            out = popArt(src, req.width, req.height, req.params, req, mosaicMask);
             break;
         case 'manga':
             out = manga(src, req.width, req.height, req.params, req);
@@ -46,6 +61,18 @@ export function render(req: RenderRequest): ArrayBuffer {
             const unknown: never = req.styleId;
             throw new Error(`未知视觉风格：${unknown}`);
         }
+    }
+    if (mosaicMask && req.mosaic) {
+        applyPostStyleChromaGuard(
+            out,
+            req.width,
+            req.height,
+            mosaicMask,
+            req.mosaic.strength,
+            req.styleId,
+            req.fullWidth,
+            req.fullHeight,
+        );
     }
     adjust(out, req.global);
     return out.buffer as ArrayBuffer;

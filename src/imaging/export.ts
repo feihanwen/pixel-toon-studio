@@ -3,6 +3,9 @@ import { exportHalo } from './exportHalo';
 import { decode } from './decode';
 import { composeFrame, type FrameContent } from './frame';
 import { WorkerClient } from './workerClient';
+import { FaceSegClient } from '../mosaic/FaceSegClient';
+import { PencilSketchClient } from '../pencil/PencilSketchClient';
+import type { RenderPencilSketch } from '../types/worker';
 import type { PhotoTab } from '../types/document';
 import { snapshot } from '../types/document';
 import { STYLES } from '../config/styles';
@@ -81,6 +84,8 @@ export async function exportPng(
     tab: PhotoTab,
     content: FrameContent,
     onProgress: (done: number, total: number) => void,
+    precomputedMosaicMask?: { width: number; height: number; maskBuffer: ArrayBuffer } | null,
+    precomputedPencilSketch?: RenderPencilSketch | null,
 ) {
     const s = snapshot(tab);
     const colorPlan = await autoColorPlan(tab, s);
@@ -89,7 +94,58 @@ export async function exportPng(
     const w = bitmap.width;
     const h = bitmap.height;
     const scale = Math.max(1, Math.max(w, h) / PREVIEW_SIDE);
-    const halo = exportHalo(s.styleId, s.params[s.styleId], scale, w, h);
+    const activeMosaic = s.mosaic && s.mosaic.strength > 0 && s.mosaic.strokes.length > 0 ? s.mosaic : null;
+    const halo = exportHalo(s.styleId, s.params[s.styleId], scale, w, h, activeMosaic ? activeMosaic.strength : 0);
+
+    let exportMosaicMask = precomputedMosaicMask ?? null;
+    if (activeMosaic && !exportMosaicMask) {
+        const longSide = Math.max(w, h);
+        const fitScale = longSide > PREVIEW_SIDE ? PREVIEW_SIDE / longSide : 1;
+        const mw = Math.max(1, Math.round(w * fitScale));
+        const mh = Math.max(1, Math.round(h * fitScale));
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = mw;
+        maskCanvas.height = mh;
+        const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+        if (maskCtx) {
+            maskCtx.drawImage(bitmap, 0, 0, mw, mh);
+            const imgData = maskCtx.getImageData(0, 0, mw, mh);
+            const faceClient = new FaceSegClient();
+            try {
+                const res = await faceClient.computeMask(mw, mh, imgData.data, activeMosaic.strokes, activeMosaic.aiFaceFit);
+                exportMosaicMask = { width: res.width, height: res.height, maskBuffer: res.maskBuffer };
+            } catch {
+                // Fall back to stroke-based mask in render worker
+            } finally {
+                faceClient.dispose();
+            }
+        }
+    }
+
+    let exportPencilSketch = s.styleId === 'pencil' ? (precomputedPencilSketch ?? null) : null;
+    if (s.styleId === 'pencil' && !exportPencilSketch) {
+        const longSide = Math.max(w, h);
+        const fitScale = longSide > 640 ? 640 / longSide : 1;
+        const sw = Math.max(8, Math.round((w * fitScale) / 8) * 8);
+        const sh = Math.max(8, Math.round((h * fitScale) / 8) * 8);
+        const sketchCanvas = document.createElement('canvas');
+        sketchCanvas.width = sw;
+        sketchCanvas.height = sh;
+        const sketchCtx = sketchCanvas.getContext('2d', { willReadFrequently: true });
+        if (sketchCtx) {
+            sketchCtx.drawImage(bitmap, 0, 0, sw, sh);
+            const imgData = sketchCtx.getImageData(0, 0, sw, sh);
+            const sketchClient = new PencilSketchClient();
+            try {
+                const res = await sketchClient.computeSketch(sw, sh, imgData.data);
+                exportPencilSketch = { width: res.width, height: res.height, sketchBuffer: res.sketchBuffer };
+            } catch {
+                // Fall back to classical contour extraction in render worker
+            } finally {
+                sketchClient.dispose();
+            }
+        }
+    }
 
     const result = document.createElement('canvas');
     result.width = w;
@@ -148,6 +204,22 @@ export async function exportPng(
                 params: s.params[s.styleId],
                 global: s.global,
                 autoColor: colorPlan,
+                mosaic: activeMosaic
+                    ? {
+                          strength: activeMosaic.strength,
+                          maskWidth: exportMosaicMask?.width ?? 0,
+                          maskHeight: exportMosaicMask?.height ?? 0,
+                          maskBuffer: exportMosaicMask ? exportMosaicMask.maskBuffer.slice(0) : undefined,
+                          strokes: exportMosaicMask ? undefined : activeMosaic.strokes,
+                      }
+                    : undefined,
+                pencilSketch: exportPencilSketch
+                    ? {
+                          width: exportPencilSketch.width,
+                          height: exportPencilSketch.height,
+                          sketchBuffer: exportPencilSketch.sketchBuffer.slice(0),
+                      }
+                    : undefined,
                 buffer: pixels.data.buffer,
             });
             if (response.kind === 'error') {

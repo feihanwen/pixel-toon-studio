@@ -540,6 +540,22 @@ button:not(:disabled):active { transform: scale(.97); }
 .export-button { width: 100%; display: flex; justify-content: space-between; padding: 14px 18px; border: 1px solid #ffffff45; border-radius: 24px; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 600; box-shadow: inset 0 1px 0 #ffffff26; }
 .export-note { margin-top: 12px; color: var(--muted); font-size: 9px; text-align: center; line-height: 1.7; }
 .toast { position: fixed; z-index: 60; bottom: 25px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); display: flex; align-items: center; gap: 16px; padding: 13px 18px; border: 1px solid var(--glass-border); border-radius: 22px; background: var(--glass-solid); color: var(--text); box-shadow: var(--floating-shadow); font-size: 12px; line-height: 1.7; }
+.stage-inner.is-painting { cursor: none; touch-action: none; }
+.mosaic-overlay-canvas { position: absolute; z-index: 4; pointer-events: none; }
+.mosaic-brush-cursor { position: absolute; z-index: 5; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(18, 40, 68, 0.55), inset 0 0 0 1px rgba(18, 40, 68, 0.35); background: rgba(92, 178, 255, 0.14); pointer-events: none; }
+.mosaic-brush-cursor.is-erase { background: rgba(255, 110, 110, 0.16); border-color: #ffd7d7; }
+.mosaic-tool-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.mosaic-tool-btn { flex: 1; padding: 9px 10px; border: 1px solid var(--glass-border); border-radius: 13px; background: var(--glass); color: var(--secondary); font-size: 11px; font-weight: 550; transition: all .15s ease; }
+.mosaic-tool-btn:hover:not(:disabled) { background: var(--glass-hover); color: var(--text); }
+.mosaic-tool-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); box-shadow: 0 4px 12px var(--accent-soft); }
+.mosaic-tool-btn:disabled { opacity: .45; cursor: not-allowed; }
+.mosaic-status-note { margin: 10px 0 0; padding: 8px 11px; border-radius: 11px; border: 1px solid var(--glass-border); background: var(--glass); color: var(--secondary); font-size: 10px; line-height: 1.5; }
+.mosaic-status-note.is-active { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+.mosaic-status-note.is-fitting { color: var(--accent); }
+.mosaic-actions-row { display: flex; gap: 8px; margin-top: 12px; }
+.mosaic-action-btn { flex: 1; padding: 8px 10px; border: 1px solid var(--glass-border); border-radius: 12px; background: var(--glass); color: var(--secondary); font-size: 10px; }
+.mosaic-action-btn:hover { background: var(--glass-hover); color: var(--text); }
+.mosaic-action-btn.danger:hover { color: var(--danger); }
 .toast button { background: transparent; color: var(--secondary); border: 0; font-size: 20px; min-width: 24px; }
 .drop-overlay { position: fixed; inset: 12px; z-index: 70; display: grid; place-items: center; border: 2px solid var(--accent-border); border-radius: 32px; background: var(--glass-solid); color: var(--text); text-align: center; pointer-events: none; font-size: 30px; font-weight: 600; box-shadow: var(--floating-shadow); }
 .drop-overlay span { color: var(--secondary); font-size: 13px; font-weight: 400; }
@@ -558,7 +574,7 @@ button:not(:disabled):active { transform: scale(.97); }
 /* Progressive enhancement keeps an opaque, readable fallback without blur support. */
 @supports ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
   .tabs, .controls, .stage-view-controls, .top-import, .top-settings-btn, .work-badge, .art-float { backdrop-filter: blur(28px) saturate(145%); -webkit-backdrop-filter: blur(28px) saturate(145%); }
-  .toast, .modal, .caption-dialog, .drop-overlay, .settings-popover { background: var(--glass-strong); backdrop-filter: blur(50px) saturate(140%); -webkit-backdrop-filter: blur(50px) saturate(140%); }
+  .toast, .modal, .drop-overlay, .settings-popover { background: var(--glass-strong); backdrop-filter: blur(50px) saturate(140%); -webkit-backdrop-filter: blur(50px) saturate(140%); }
   .stage-corner, .stage-processing, .compare-handle { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 }
 @media (max-width: 1100px) {
@@ -581,7 +597,7 @@ button:not(:disabled):active { transform: scale(.97); }
 }
 @media (prefers-reduced-transparency: reduce) {
   :root { --glass: var(--glass-solid); --glass-strong: var(--glass-solid); }
-  .tabs, .controls, .stage-view-controls, .toast, .modal, .caption-dialog, .drop-overlay, .top-import, .top-settings-btn, .settings-popover, .work-badge, .art-float, .modal-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .tabs, .controls, .stage-view-controls, .toast, .modal, .drop-overlay, .top-import, .top-settings-btn, .settings-popover, .work-badge, .art-float, .modal-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 @media (prefers-contrast: more) {
   :root { --secondary: var(--text); --muted: var(--text); --glass-border: var(--text); --divider: var(--text); }

@@ -27,7 +27,14 @@ export function popDotCoverage(x: number, y: number, period: number, radius: num
     return 1 - smoothstep(radius - .6, radius + .6, Math.sqrt(dx * dx + dy * dy));
 }
 
-export function popArt(src: Uint8ClampedArray, w: number, h: number, p: Record<string, number>, ctx: StyleContext) {
+export function popArt(
+    src: Uint8ClampedArray,
+    w: number,
+    h: number,
+    p: Record<string, number>,
+    ctx: StyleContext,
+    mosaicMask?: Float32Array | null,
+) {
     const out = new Uint8ClampedArray(src.length), { lum, sat, grad } = structure(src, w, h);
     const scale = Math.max(1, ctx.scale);
     const period = popDotPeriod(p.dot ?? 6, scale);
@@ -38,7 +45,8 @@ export function popArt(src: Uint8ClampedArray, w: number, h: number, p: Record<s
     const poster = Math.max(0, Math.min(1, (p.poster ?? 90) / 100));
     const mix = Math.min(1, poster / .9);
     const contrast = 1 + .24 * mix + .16 * Math.max(0, (poster - .9) / .1);
-    const step = 255 / (POP_LEVELS - 1);
+    const levels = Math.max(2, Math.round(p.levels ?? POP_LEVELS));
+    const step = 255 / (levels - 1);
     const lut = new Float32Array(256);
     for (let v = 0; v < 256; v++) {
         const boosted = clamp((v - 128) * contrast + 128);
@@ -51,8 +59,9 @@ export function popArt(src: Uint8ClampedArray, w: number, h: number, p: Record<s
         const radius = period * (.13 + .28 * gate);
         const spot = gate > 0 ? popDotCoverage(ctx.originX + x, ctx.originY + y, period, radius) * gate : 0;
         const ink = inkStrength > 0 ? inkAt(q, grad, lum, sat, w, h, 55, 80) * inkStrength : 0;
-        const r = shift ? sampleBilinear(src, w, h, x + shift, y, 0) : src[i];
-        const b = shift ? sampleBilinear(src, w, h, x - shift, y, 2) : src[i + 2];
+        const localShift = mosaicMask ? shift * (1 - mosaicMask[q]) : shift;
+        const r = localShift ? sampleBilinear(src, w, h, x + localShift, y, 0) : src[i];
+        const b = localShift ? sampleBilinear(src, w, h, x - localShift, y, 2) : src[i + 2];
         const channels = [r, src[i + 1], b];
         for (let c = 0; c < 3; c++) {
             const v = lut[Math.max(0, Math.min(255, Math.round(channels[c])))];

@@ -92,7 +92,7 @@ describe('fine pop art', () => {
         const legacy = normalizeHistory({ entries: [raw, structuredClone(raw)], cursor: 0 });
         expect(legacy.entries.every(s => s.params.halftone.poster === 90 && s.autoColor.algorithmVersion === 1)).toBe(true);
         expect(normalizeHistory(legacy)).toEqual(legacy);
-        expect(initialSnapshot().params.halftone).toEqual({ dot: 6, density: 45, ink: 55, shift: 0, poster: 90 });
+        expect(initialSnapshot().params.halftone).toEqual({ dot: 6, density: 45, ink: 55, shift: 0, poster: 90, levels: 5 });
     });
     for (const [w, h, tileSide] of [[387, 259, 137], [1927, 173, 677], [728, 972, 251]]) {
         it(`stitches at ${w}x${h} including maximum channel shift`, () => {

@@ -1,4 +1,20 @@
 import type { StyleId } from '../config/styles';
+import type { MosaicStroke } from './mosaic';
+
+export interface RenderMosaic {
+    strength: number;
+    maskWidth: number;
+    maskHeight: number;
+    maskBuffer?: ArrayBuffer;
+    strokes?: MosaicStroke[];
+}
+
+export interface RenderPencilSketch {
+    width: number;
+    height: number;
+    sketchBuffer: ArrayBuffer;
+}
+
 export interface RenderRequest {
     kind: 'render';
     id: number;
@@ -22,8 +38,13 @@ export interface RenderRequest {
         brightness: number;
         contrast: number;
         saturation: number;
+        highlights?: number;
+        shadows?: number;
+        temperature?: number;
     };
     autoColor?: import('../imaging/autoColor').AutoColorPlan | null;
+    mosaic?: RenderMosaic;
+    pencilSketch?: RenderPencilSketch;
     buffer: ArrayBuffer;
 }
 export interface RenderResult {

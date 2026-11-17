@@ -8,10 +8,12 @@ import { uiText } from '../config/i18n';
 import { ParameterSlider } from './ParameterSlider';
 import { StudioIcon } from './StudioIcon';
 import { duotonePalette } from '../worker/styles/duotone';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface Props {
     enhancementPanel?: ReactNode;
+    mosaicPanel?: ReactNode;
+    pickerPanel?: ReactNode;
     outputSize?: { width: number; height: number };
     tab: PhotoTab | null;
     tabCount?: number;
@@ -40,7 +42,11 @@ interface Props {
 export function ControlsPanel(props: Props) {
     const { language } = usePreferences();
     const t = uiText(language);
-    const { tab, snapshot: s, exif } = props;
+    const { tab, snapshot: s, exif, pickerPanel } = props;
+    const isPicking = Boolean(tab && s && pickerPanel);
+    const asideRef = useRef<HTMLElement>(null);
+    const returnFocusRef = useRef<HTMLElement | null>(null);
+    const wasPickingRef = useRef(false);
     const frameStyle = getFrameStyle(s?.frameStyleId);
     const content: FrameContent = {
         frameStyleId: s?.frameStyleId,
@@ -51,8 +57,30 @@ export function ControlsPanel(props: Props) {
     const definitions = s ? styleParams(s.styleId) : null;
     const isExifContent = Boolean(content.showExif && content.exif && Object.values(content.exif).some(Boolean));
 
+    useEffect(() => {
+        if (isPicking && asideRef.current) {
+            asideRef.current.scrollTop = 0;
+        }
+        if (wasPickingRef.current && !isPicking) {
+            returnFocusRef.current?.focus();
+            returnFocusRef.current = null;
+        }
+        wasPickingRef.current = isPicking;
+    }, [isPicking]);
+
+    function openFrameStylePicker() {
+        returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        props.onOpenFrameStyle();
+    }
+
+    function openCaptionPicker() {
+        returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        props.onOpenCaption();
+    }
+
     return (
-        <aside className="controls" aria-label={t.controlsAria}>
+        <aside ref={asideRef} className={`controls${isPicking ? ' is-picking' : ''}`} aria-label={t.controlsAria}>
+            {isPicking ? pickerPanel : null}
             <div className="controls-top">
                 <div className="controls-title">
                     <span className="controls-symbol">
@@ -157,6 +185,7 @@ export function ControlsPanel(props: Props) {
                     </details>
 
                     {props.enhancementPanel}
+                    {props.mosaicPanel}
 
                     <details className="control-section global-adjustments">
                         <summary>
@@ -219,7 +248,7 @@ export function ControlsPanel(props: Props) {
                                                 <small> · {frameCategoryLabel(frameStyle.category, language)}</small>
                                             </div>
                                         </div>
-                                        <button className="choose-caption" onClick={props.onOpenFrameStyle}>
+                                        <button className="choose-caption" onClick={openFrameStylePicker}>
                                             {t.browseFrameStyles}
                                         </button>
                                     </div>
@@ -253,7 +282,7 @@ export function ControlsPanel(props: Props) {
                                                 <button onClick={props.onCaption}>{t.shuffleCaption}</button>
                                             </div>
                                             <p>{captionText(s.captionId)}</p>
-                                            <button className="choose-caption" onClick={props.onOpenCaption}>
+                                            <button className="choose-caption" onClick={openCaptionPicker}>
                                                 {t.browseCaptions}
                                             </button>
                                         </div>

@@ -1,0 +1,31 @@
+{
+  "id": "pencil-lineart",
+  "version": "1.0.0",
+  "file": "model.onnx",
+  "sha256": "1fef40b8f7126d827e30fbebccf95ae9b0b391795df926bf9366a821bad4f498",
+  "bytes": 17193338,
+  "maxSide": 640,
+  "layout": "NCHW",
+  "channels": "RGB",
+  "license": "MIT",
+  "operators": [
+    "Add",
+    "Cast",
+    "Concat",
+    "Constant",
+    "ConstantOfShape",
+    "Conv",
+    "ConvTranspose",
+    "InstanceNormalization",
+    "Pad",
+    "Relu",
+    "Reshape",
+    "Sigmoid",
+    "Slice",
+    "Transpose"
+  ],
+  "inputName": "input",
+  "outputName": "output",
+  "sourceUrl": "https://huggingface.co/rocca/informative-drawings-line-art-onnx/resolve/main/model.onnx",
+  "author": "Caroline Chan (Informative Drawings, CVPR 2022)"
+}

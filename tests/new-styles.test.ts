@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultParams, STYLES } from '../src/config/styles';
 import { duotonePalette } from '../src/worker/styles/duotone';
-import { relativeLuminance } from '../src/worker/shared/color';
+import { adjust, relativeLuminance } from '../src/worker/shared/color';
 import { fixture, flat, metrics, newStyles, processStyle } from './style-fixtures';
 
 describe('new style contracts', () => {
@@ -100,5 +100,24 @@ describe('new style contracts', () => {
         const off = processStyle('film', src, w, h, params), on = processStyle('film', src, w, h, { ...params, halation: 100 });
         expect(on[0]).toBe(off[0]);
         expect(on[(47 * w + 59) * 4]).toBeGreaterThan(off[(47 * w + 59) * 4]);
+    });
+    it('cel parameters and expanded global tone/temperature controls have observable independent effects', () => {
+        const source = fixture(96, 72), celParams = defaultParams().cel;
+        for (const [key, spec] of Object.entries(STYLES.cel.params)) {
+            const a = processStyle('cel', source, 96, 72, { ...celParams, [key]: spec.min });
+            const b = processStyle('cel', source, 96, 72, { ...celParams, [key]: spec.max });
+            expect(metrics(a, b).mad, `cel.${key}`).toBeGreaterThan(.1);
+        }
+        const dark = flat(8, 8, 40);
+        adjust(dark, { brightness: 0, contrast: 0, saturation: 0, shadows: 80 });
+        expect(dark[0]).toBeGreaterThan(50);
+
+        const bright = flat(8, 8, 220);
+        adjust(bright, { brightness: 0, contrast: 0, saturation: 0, highlights: -80 });
+        expect(bright[0]).toBeLessThan(210);
+
+        const warm = flat(8, 8, 128);
+        adjust(warm, { brightness: 0, contrast: 0, saturation: 0, temperature: 80 });
+        expect(warm[0]).toBeGreaterThan(warm[2]);
     });
 });

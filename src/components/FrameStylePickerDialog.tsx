@@ -37,53 +37,30 @@ export function FrameStylePickerDialog({
     const t = uiText(language);
     const [category, setCategory] = useState<FrameCategory | 'all'>('all');
     const dialog = useRef<HTMLDivElement>(null);
-    const previousFocus = useRef<HTMLElement | null>(null);
     const options = useMemo(() => filterFrameStyles(category), [category]);
     const currentStyle = getFrameStyle(selectedId);
     const ratio = photoWidth > 0 && photoHeight > 0 ? `${photoWidth} / ${photoHeight}` : '3 / 4';
 
     useEffect(() => {
-        previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         dialog.current?.querySelector<HTMLElement>('button')?.focus();
-        return () => previousFocus.current?.focus();
+        dialog.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
     }, []);
 
     function keyDown(event: React.KeyboardEvent) {
         if (event.key === 'Escape') {
             event.preventDefault();
             onCancel();
-            return;
-        }
-        if (event.key !== 'Tab' || !dialog.current) return;
-        const focusable = Array.from(
-            dialog.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)'),
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last?.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first?.focus();
         }
     }
 
     return (
         <div
-            className="modal-backdrop caption-backdrop"
-            onMouseDown={event => {
-                if (event.target === event.currentTarget) onCancel();
-            }}
+            ref={dialog}
+            className="inline-picker frame-style-picker"
+            role="region"
+            aria-labelledby="frame-style-title"
+            onKeyDown={keyDown}
         >
-            <div
-                ref={dialog}
-                className="caption-dialog frame-style-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="frame-style-title"
-                onKeyDown={keyDown}
-            >
                 <div className="caption-dialog-heading">
                     <div>
                         <span className="eyebrow">POLAROID FRAME</span>
@@ -172,6 +149,5 @@ export function FrameStylePickerDialog({
                     </div>
                 </div>
             </div>
-        </div>
     );
 }

@@ -1,9 +1,9 @@
-import { analyzeAutoColor, type AutoColorPlan } from '../imaging/autoColor';
+import { analyzeAutoColor } from '../imaging/autoColor';
 import { decode, toImageData, imageDataCanvas } from '../imaging/decode';
 import { getResult } from '../storage/enhancementStore';
 import type { PhotoTab, EditorSnapshot } from '../types/document';
-import { enhancementSharpen } from '../types/enhancement';
-import { applyAdaptiveUsm } from './usm';
+import { enhancementClarity, enhancementDenoise, enhancementSharpen } from '../types/enhancement';
+import { applyAdaptiveUsm, applyEdgeDenoise, applyLocalClarity } from './usm';
 
 export function canvasBlob(canvas: HTMLCanvasElement, type = 'image/png', quality?: number) {
     return new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片编码失败，可能是内存不足')), type, quality));
@@ -15,7 +15,7 @@ export async function resolveBase(tab: PhotoTab, state: EditorSnapshot) {
     if (!result) throw new Error('增强缓存已被清理，请关闭增强使用原图，或手动重新生成');
     return { blob: result.blob, width: result.width, height: result.height };
 }
-// Shared by preview and full-resolution export. Strength and USM sharpen never start a model task.
+// Shared by preview and full-resolution export. Strength, USM sharpen, clarity and denoise never start a model task.
 const previewPairs = new Map<string, Promise<{ original: ImageData; enhanced: ImageData }>>();
 export async function basePixels(tab: PhotoTab, state: EditorSnapshot, maxSide: number): Promise<ImageData> {
     const selection = state.enhancement;
@@ -39,8 +39,12 @@ export async function basePixels(tab: PhotoTab, state: EditorSnapshot, maxSide: 
         const pair = await previewPairs.get(key)!;
         const amount = selection.strength / 100, pixels = new ImageData(new Uint8ClampedArray(pair.enhanced.data), pair.enhanced.width, pair.enhanced.height);
         if (amount < 1) for (let i = 0; i < pixels.data.length; i += 4) for (let c = 0; c < 3; c++) pixels.data[i + c] = pair.original.data[i + c] * (1 - amount) + pair.enhanced.data[i + c] * amount;
+        const denoise = enhancementDenoise(selection);
+        if (denoise > 0) applyEdgeDenoise(pixels.data, pixels.width, pixels.height, denoise);
         const sharpen = enhancementSharpen(selection);
         if (sharpen > 0) applyAdaptiveUsm(pixels.data, pixels.width, pixels.height, sharpen);
+        const clarity = enhancementClarity(selection);
+        if (clarity !== 0) applyLocalClarity(pixels.data, pixels.width, pixels.height, clarity);
         return pixels;
     }
     return uncachedBasePixels(tab, state, maxSide);
@@ -61,32 +65,44 @@ async function uncachedBasePixels(tab: PhotoTab, state: EditorSnapshot, maxSide:
             for (let i = 0; i < data.data.length; i += 4) for (let c = 0; c < 3; c++) pixels.data[i + c] = data.data[i + c] * (1 - amount) + pixels.data[i + c] * amount;
         } finally { original.close(); canvas.width = 1; }
     }
+    const denoise = enhancementDenoise(selection);
+    if (denoise > 0) applyEdgeDenoise(pixels.data, pixels.width, pixels.height, denoise);
     const sharpen = enhancementSharpen(selection);
     if (sharpen > 0) applyAdaptiveUsm(pixels.data, pixels.width, pixels.height, sharpen);
+    const clarity = enhancementClarity(selection);
+    if (clarity !== 0) applyLocalClarity(pixels.data, pixels.width, pixels.height, clarity);
     return pixels;
 }
 export async function exportBase(tab: PhotoTab, state: EditorSnapshot) {
     const base = await resolveBase(tab, state);
     const selection = state.enhancement;
     const sharpen = enhancementSharpen(selection);
-    if (!selection?.enabled || selection.strength === 0 || (selection.strength === 100 && sharpen === 0)) return base;
+    const denoise = enhancementDenoise(selection);
+    const clarity = enhancementClarity(selection);
+    if (!selection?.enabled || selection.strength === 0 || (selection.strength === 100 && sharpen === 0 && denoise === 0 && clarity === 0)) return base;
     const canvas = imageDataCanvas(await basePixels(tab, state, Infinity));
     try { return { ...base, blob: await canvasBlob(canvas) }; } finally { canvas.width = 1; }
 }
 
-const colorPlans = new Map<string, Promise<AutoColorPlan>>();
+const colorSamples = new Map<string, Promise<ImageData>>();
 
 // Always analyze the same whole-photo sample, never individual export tiles.
 export async function autoColorPlan(tab: PhotoTab, state: EditorSnapshot) {
     if (!state.autoColor?.enabled || state.autoColor.strength === 0) return null;
     const version = state.autoColor.algorithmVersion === 2 ? 2 : 1;
-    const key = JSON.stringify([tab.id, state.enhancement, version]);
-    let plan = colorPlans.get(key);
-    if (!plan) {
-        plan = basePixels(tab, state, 384).then(sample => analyzeAutoColor(sample.data, 100, version));
-        colorPlans.set(key, plan);
-        plan.catch(() => { if (colorPlans.get(key) === plan) colorPlans.delete(key); });
-        while (colorPlans.size > 8) colorPlans.delete(colorPlans.keys().next().value!);
+    const key = JSON.stringify([tab.id, state.enhancement]);
+    let samplePromise = colorSamples.get(key);
+    if (!samplePromise) {
+        samplePromise = basePixels(tab, state, 384);
+        colorSamples.set(key, samplePromise);
+        samplePromise.catch(() => { if (colorSamples.get(key) === samplePromise) colorSamples.delete(key); });
+        while (colorSamples.size > 8) colorSamples.delete(colorSamples.keys().next().value!);
     }
-    return { ...await plan, strength: state.autoColor.strength / 100 };
+    const sample = await samplePromise;
+    return analyzeAutoColor(sample.data, state.autoColor.strength, version, {
+        exposure: state.autoColor.exposure,
+        contrast: state.autoColor.contrast,
+        temperature: state.autoColor.temperature,
+        vibrance: state.autoColor.vibrance,
+    });
 }

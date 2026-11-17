@@ -1,86 +1,188 @@
-import { boxBlur } from '../shared/blur';
-import { clamp, luminance, smoothstep } from '../shared/color';
+import { clamp, oklabToSrgbGamutSafe, rgbToOklab } from '../shared/color';
 
 /**
- * 2D 线条像素插画风 (PIXEL LINE)
+ * 2D Pixel Art / Pixel Line Illustration
  *
- * Combines three Non-Photorealistic Rendering (NPR) techniques so both full-scene pixel
- * structure and fine portrait/facial features remain crisp and readable:
- *  1. Content-Adaptive Quadtree / Multi-Scale Pixel Grid (inspired by Gerstner et al.,
- *     "Pixelated Image Abstraction", NPAR 2012): flat regions and broad limbs quantize to
- *     clean `size x size` pixel blocks, while high-density feature regions (faces, hands,
- *     logos) and sharp contours subdivide into `fineSize x fineSize` pixel sub-blocks so
- *     facial features never blur into a coarse mosaic.
- *  2. Perceptual Oklab Illustration Palette Quantization with tonal smoothing.
- *  3. XDoG + Gradient Ridge 2D Pixel-Line Extraction (inspired by Winnemöller et al.,
- *     "XDoG: An eXtended Difference-of-Gaussians Compendium", 2012, and Inglis & Kaplan,
- *     "Pixelating Vector Line Art", NPAR 2012) snapped to the fine pixel grid with
- *     hue-preserving Selective Outlining (Sel-Out).
+ * Fuses the two open-source pipelines from:
+ *  - yogthos/pixel-mosaic (Sobel 3x3 + 4-sector NMS edge detection, edge-aware
+ *    luminance-median vs average block rendering, contrast adjustment)
+ *  - painebenjamin/unfake.py (2x2 morphological open/close cleanup, perceptual
+ *    color quantization, dominant-color block downscaling, jaggy/speck cleanup)
  */
 
-function srgbToLinear(v: number): number {
-    const n = v / 255;
-    return n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4;
+// ---------- 1. unfake.py: 2x2 Morphological Open + Close Cleanup ----------
+function erode2x2(src: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+    const out = new Uint8ClampedArray(src.length);
+    for (let y = 0; y < h; y++) {
+        const y1 = Math.min(h - 1, y + 1);
+        for (let x = 0; x < w; x++) {
+            const x1 = Math.min(w - 1, x + 1);
+            const i00 = (y * w + x) * 4;
+            const i10 = (y * w + x1) * 4;
+            const i01 = (y1 * w + x) * 4;
+            const i11 = (y1 * w + x1) * 4;
+            out[i00] = Math.min(src[i00], src[i10], src[i01], src[i11]);
+            out[i00 + 1] = Math.min(src[i00 + 1], src[i10 + 1], src[i01 + 1], src[i11 + 1]);
+            out[i00 + 2] = Math.min(src[i00 + 2], src[i10 + 2], src[i01 + 2], src[i11 + 2]);
+            out[i00 + 3] = 255;
+        }
+    }
+    return out;
 }
 
-function linearToSrgb(v: number): number {
-    const c = Math.max(0, Math.min(1, v));
-    return (c <= 0.0031308 ? 12.92 * c : 1.055 * (c ** (1 / 2.4)) - 0.055) * 255;
+function dilate2x2(src: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+    const out = new Uint8ClampedArray(src.length);
+    for (let y = 0; y < h; y++) {
+        const y0 = Math.max(0, y - 1);
+        for (let x = 0; x < w; x++) {
+            const x0 = Math.max(0, x - 1);
+            const i00 = (y * w + x) * 4;
+            const i10 = (y * w + x0) * 4;
+            const i01 = (y0 * w + x) * 4;
+            const i11 = (y0 * w + x0) * 4;
+            out[i00] = Math.max(src[i00], src[i10], src[i01], src[i11]);
+            out[i00 + 1] = Math.max(src[i00 + 1], src[i10 + 1], src[i01 + 1], src[i11 + 1]);
+            out[i00 + 2] = Math.max(src[i00 + 2], src[i10 + 2], src[i01 + 2], src[i11 + 2]);
+            out[i00 + 3] = 255;
+        }
+    }
+    return out;
 }
 
-function rgbToOklab(r: number, g: number, b: number): [number, number, number] {
-    const lr = srgbToLinear(r), lg = srgbToLinear(g), lb = srgbToLinear(b);
-    const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
-    const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
-    const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
-    return [
-        0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-        1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-        0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-    ];
+function morphologicalCleanup(src: Uint8ClampedArray, w: number, h: number, blend: number): Uint8ClampedArray {
+    if (blend <= 0.01 || w < 2 || h < 2) {
+        return src;
+    }
+    const opened = dilate2x2(erode2x2(src, w, h), w, h);
+    const closed = erode2x2(dilate2x2(opened, w, h), w, h);
+    if (blend >= 0.99) {
+        return closed;
+    }
+    const out = new Uint8ClampedArray(src.length);
+    for (let i = 0; i < src.length; i += 4) {
+        out[i] = clamp(Math.round(src[i] + (closed[i] - src[i]) * blend));
+        out[i + 1] = clamp(Math.round(src[i + 1] + (closed[i + 1] - src[i + 1]) * blend));
+        out[i + 2] = clamp(Math.round(src[i + 2] + (closed[i + 2] - src[i + 2]) * blend));
+        out[i + 3] = 255;
+    }
+    return out;
 }
 
-function oklabToRgb(L: number, a: number, b: number): [number, number, number] {
-    const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-    const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-    const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
-    const l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
-    return [
-        linearToSrgb(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
-        linearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
-        linearToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s),
-    ];
+// ---------- 2. pixel-mosaic: Sobel 3x3 + 4-Sector NMS Edge Detection ----------
+function calculateEdgeMap(src: Uint8ClampedArray, w: number, h: number, edgeSharpness: number): Float32Array {
+    const n = w * h;
+    const gray = new Float32Array(n);
+    for (let q = 0; q < n; q++) {
+        const i = q * 4;
+        gray[q] = (src[i] + src[i + 1] + src[i + 2]) / 3;
+    }
+
+    const magnitudeMap = new Float32Array(n);
+    const directionMap = new Float32Array(n);
+
+    for (let y = 1; y < h - 1; y++) {
+        const rowU = (y - 1) * w;
+        const row = y * w;
+        const rowD = (y + 1) * w;
+        for (let x = 1; x < w - 1; x++) {
+            const g00 = gray[rowU + x - 1], g01 = gray[rowU + x], g02 = gray[rowU + x + 1];
+            const g10 = gray[row + x - 1], g12 = gray[row + x + 1];
+            const g20 = gray[rowD + x - 1], g21 = gray[rowD + x], g22 = gray[rowD + x + 1];
+
+            const gx = -g00 + g02 - 2 * g10 + 2 * g12 - g20 + g22;
+            const gy = -g00 - 2 * g01 - g02 + g20 + 2 * g21 + g22;
+
+            const q = row + x;
+            magnitudeMap[q] = Math.sqrt(gx * gx + gy * gy);
+            directionMap[q] = Math.atan2(gy, gx) + Math.PI / 2;
+        }
+    }
+
+    // 4-sector Non-Maximum Suppression (exact logic from pixel-mosaic/src/edgeDetection.js)
+    const suppressed = new Float32Array(n);
+    const PI = Math.PI;
+    const TAU = PI * 2;
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            const mag = magnitudeMap[idx];
+            if (mag === 0) continue;
+
+            let dir = directionMap[idx] % TAU;
+            if (dir < 0) dir += TAU;
+
+            let n1: number;
+            let n2: number;
+            if ((dir >= 0 && dir < PI / 8) || (dir >= (15 * PI) / 8 && dir < TAU) || (dir >= (7 * PI) / 8 && dir < (9 * PI) / 8)) {
+                n1 = magnitudeMap[idx - 1];
+                n2 = magnitudeMap[idx + 1];
+            } else if ((dir >= PI / 8 && dir < (3 * PI) / 8) || (dir >= (9 * PI) / 8 && dir < (11 * PI) / 8)) {
+                n1 = magnitudeMap[(y - 1) * w + (x + 1)];
+                n2 = magnitudeMap[(y + 1) * w + (x - 1)];
+            } else if ((dir >= (3 * PI) / 8 && dir < (5 * PI) / 8) || (dir >= (11 * PI) / 8 && dir < (13 * PI) / 8)) {
+                n1 = magnitudeMap[(y - 1) * w + x];
+                n2 = magnitudeMap[(y + 1) * w + x];
+            } else {
+                n1 = magnitudeMap[(y - 1) * w + (x - 1)];
+                n2 = magnitudeMap[(y + 1) * w + (x + 1)];
+            }
+
+            if (mag >= n1 && mag >= n2) {
+                suppressed[idx] = mag;
+            }
+        }
+    }
+
+    // Tile-invariant threshold mapped from edgeSharpness (0..1)
+    const thresh = 22 + (1 - edgeSharpness) * 58;
+    const edgeMap = new Float32Array(n);
+    for (let q = 0; q < n; q++) {
+        if (suppressed[q] >= thresh) {
+            edgeMap[q] = 1.0;
+        }
+    }
+    return edgeMap;
 }
 
-function quantizeOklabColor(
+// ---------- 3. Perceptual Discrete Color Quantization (for Dominant Mode & Palette) ----------
+function quantizePerceptualColor(
     r: number,
     g: number,
     b: number,
-    levels: number,
-    faceProtect: number,
-): [number, number, number] {
+    colorCount: number,
+): { r: number; g: number; b: number; key: number } {
     const [L, a, ob] = rgbToOklab(r, g, b);
-    // Gentle S-curve contrast keeps colors vibrant without harsh midtone splits on faces
-    const sStrength = 0.30 * (1 - faceProtect * 0.55);
-    const curved = L + (smoothstep(0.02, 0.98, L) - L) * sStrength;
-    const effLevels = levels * (1 + faceProtect * 0.65);
-    const lStep = 1 / (effLevels + 1);
-    const scaledL = curved / lStep - 0.5;
-    const baseIdx = Math.floor(scaledL);
-    const frac = scaledL - baseIdx;
-    const snappedIdx = baseIdx + (faceProtect > 0.25 ? smoothstep(0.22, 0.78, frac) : Math.round(frac));
-    const qL = Math.max(0, Math.min(1, (snappedIdx + 0.5) * lStep));
+    const lLevels = Math.max(2, Math.round(colorCount * 0.85 + 2));
+    const lStep = 1 / (lLevels - 1);
+    const lIdx = Math.max(0, Math.min(lLevels - 1, Math.round(L / lStep)));
+    const qL = lIdx * lStep;
 
     const chroma = Math.hypot(a, ob);
-    const chromaBoost = 1.16 - faceProtect * 0.1;
-    const boosted = Math.min(0.32, chroma * chromaBoost);
-    const chromaStep = 0.32 / Math.max(4, levels + 1);
-    const qChroma = chroma < 0.01 ? 0 : Math.max(1, Math.round(boosted / chromaStep)) * chromaStep;
-    const finalChroma = qChroma * (1 - faceProtect * 0.4) + boosted * (faceProtect * 0.4);
-    const scaleC = chroma > 1e-5 ? finalChroma / chroma : 0;
+    const cLevels = Math.max(3, Math.round(colorCount * 0.65 + 2));
+    const cStep = 0.28 / cLevels;
 
-    const [qr, qg, qb] = oklabToRgb(qL, a * scaleC, ob * scaleC);
-    return [clamp(Math.round(qr)), clamp(Math.round(qg)), clamp(Math.round(qb))];
+    let cIdx = 0;
+    let hIdx = 0;
+    let qA = 0;
+    let qB = 0;
+    if (chroma >= 0.012) {
+        cIdx = Math.max(1, Math.min(cLevels, Math.round(chroma / cStep)));
+        const qC = cIdx * cStep;
+        const angle = Math.atan2(ob, a);
+        const hBins = Math.max(12, colorCount * 2);
+        const hStep = (Math.PI * 2) / hBins;
+        hIdx = Math.round((angle + Math.PI) / hStep) % hBins;
+        const qAngle = hIdx * hStep - Math.PI;
+        qA = Math.cos(qAngle) * qC;
+        qB = Math.sin(qAngle) * qC;
+    }
+
+    const [qr, qg, qb] = oklabToSrgbGamutSafe(qL, qA, qB);
+    const rr = clamp(Math.round(qr));
+    const gg = clamp(Math.round(qg));
+    const bb = clamp(Math.round(qb));
+    const key = (lIdx << 16) | (cIdx << 8) | hIdx;
+    return { r: rr, g: gg, b: bb, key };
 }
 
 export function pixel(
@@ -92,119 +194,52 @@ export function pixel(
     originY: number,
     scale: number,
 ): Uint8ClampedArray {
-    const size = Math.max(2, Math.round((p.size ?? 6) * scale));
-    const filterNorm = Math.max(0, Math.min(1, (p.filter ?? 65) / 100));
-    const inkStrength = Math.max(0, Math.min(1, (p.ink ?? 70) / 100));
-    const levels = Math.max(2, Math.round(p.colors ?? 9));
+    const size = Math.max(2, Math.round((p.size ?? 3) * scale));
+    const edgeSharpness = Math.max(0, Math.min(1, (p.edgeSharpness ?? 80) / 100));
+    const cleanupBlend = Math.max(0, Math.min(1, (p.cleanup ?? 45) / 100));
+    const colorCount = Math.max(2, Math.round(p.colors ?? 12));
+    const dominantNorm = Math.max(0, Math.min(1, (p.dominant ?? 70) / 100));
+    const contrastFactor = Math.max(0.2, 1 + (p.contrast ?? 12) / 100);
     const n = w * h;
 
-    // Fine pixel unit for 2D linework and detail subdivision (e.g. 2px when size=6, 1px when size<=3)
-    const fineSize = size <= 3 ? 1 : Math.max(2, Math.round(size / 3));
+    // 1. unfake.py: 2x2 morphological open/close pre-cleanup
+    const cleaned = morphologicalCleanup(src, w, h, cleanupBlend);
 
-    // ---------- 1. Luminance, warm-tone detection, and multi-scale XDoG / gradient ----------
-    const lum = new Float32Array(n);
-    const sat = new Float32Array(n);
-    const warm = new Float32Array(n);
+    // 2. pixel-mosaic: Sobel 3x3 + 4-sector NMS edge map
+    const edgeMap = calculateEdgeMap(cleaned, w, h, edgeSharpness);
 
+    // 3. Pre-quantize pixels (unfake.py pipeline runs color quantization before dominant block downscaling)
+    const quantR = new Uint8ClampedArray(n);
+    const quantG = new Uint8ClampedArray(n);
+    const quantB = new Uint8ClampedArray(n);
+    const quantKey = new Int32Array(n);
     for (let q = 0; q < n; q++) {
         const i = q * 4;
-        const r = src[i], g = src[i + 1], b = src[i + 2];
-        const l = luminance(r, g, b);
-        lum[q] = l;
-        const hi = Math.max(r, g, b), lo = Math.min(r, g, b);
-        const s = hi > 0 ? (hi - lo) / hi : 0;
-        sat[q] = s;
-        if (r > g && g >= b * 0.92 && l > 35 && l < 242) {
-            const rgDiff = (r - b) / 255;
-            warm[q] = smoothstep(0.05, 0.20, rgDiff) * (1 - smoothstep(0.58, 0.85, s));
-        }
+        const pq = quantizePerceptualColor(cleaned[i], cleaned[i + 1], cleaned[i + 2], colorCount);
+        quantR[q] = pq.r;
+        quantG[q] = pq.g;
+        quantB[q] = pq.b;
+        quantKey[q] = (pq.r << 16) | (pq.g << 8) | pq.b;
     }
 
-    const warmContext = w > 2 && h > 2 ? boxBlur(warm, w, h, Math.max(2, size)) : warm;
-    const blurFine = w > 2 && h > 2 ? boxBlur(lum, w, h, Math.max(1, Math.floor(fineSize * 0.5))) : lum;
-    const blurMid = w > 2 && h > 2 ? boxBlur(lum, w, h, Math.max(2, Math.round(size * 0.5))) : lum;
-    const blurBroad = w > 2 && h > 2 ? boxBlur(lum, w, h, Math.max(3, size)) : lum;
-
-    const grad = new Float32Array(n);
-    const dogField = new Float32Array(n);
-    const featureSeed = new Float32Array(n);
-
-    for (let y = 0; y < h; y++) {
-        const y0 = Math.max(0, y - 1), y1 = Math.min(h - 1, y + 1);
-        for (let x = 0; x < w; x++) {
-            const x0 = Math.max(0, x - 1), x1 = Math.min(w - 1, x + 1);
-            const q = y * w + x;
-            const gx = (lum[y * w + x1] - lum[y * w + x0]) * 0.5;
-            const gy = (lum[y1 * w + x] - lum[y0 * w + x]) * 0.5;
-            const gMag = Math.hypot(gx, gy);
-            grad[q] = gMag;
-
-            // Sharp dark feature valley (XDoG): emphasizes compact dark strokes (eyes, lashes, brows, lips, seams)
-            const valleySharp = Math.max(0, blurMid[q] - blurFine[q]);
-            const valleyWide = Math.max(0, blurBroad[q] - blurFine[q]);
-            const dog = valleySharp * 0.72 + valleyWide * 0.28;
-            dogField[q] = dog;
-
-            // Compact feature density seed: high where warm skin meets dark features (eyes, brows, hair, mouth, fingers)
-            if (warmContext[q] > 0.12 && (dog > 7 || gMag > 14)) {
-                featureSeed[q] = warmContext[q] * smoothstep(6, 26, dog * 1.3 + gMag * 0.7);
-            }
-        }
-    }
-
-    // Face / compact-feature zone: high where warm tones have dense internal features (faces, hands),
-    // while broad smooth limbs (legs/arms interior) keep low density so they show crisp pixel blocks!
-    const featureDensity = w > 2 && h > 2 ? boxBlur(featureSeed, w, h, Math.max(3, size * 2)) : featureSeed;
-
-    const detailField = new Float32Array(n);
-    const lineInkField = new Float32Array(n);
-
-    for (let q = 0; q < n; q++) {
-        const wc = warmContext[q];
-        const fd = Math.min(1, featureDensity[q] * 3.8);
-        const gMag = grad[q];
-        const dog = dogField[q];
-
-        // Suppress faint texture in bright, low-saturation flat backgrounds (ceiling, walls)
-        const isFlatBright = blurBroad[q] > 160 && sat[q] < 0.22 && wc < 0.15;
-        const bgSuppress = isFlatBright ? 0.4 + filterNorm * 0.55 : 0;
-
-        const rawDetail = (gMag * 0.95 + dog * 1.75) * (1 - bgSuppress * 0.75);
-        const detailThreshLo = (11 + filterNorm * 15) * (1 - fd * 0.5);
-        const detailThreshHi = (27 + filterNorm * 24) * (1 - fd * 0.45);
-        detailField[q] = Math.max(
-            fd * 0.92,
-            smoothstep(detailThreshLo, detailThreshHi, rawDetail),
-        );
-
-        // 2D Illustration Line response:
-        // Require a crisp gradient or sharp XDoG valley so soft nose/cheek shadows don't turn into dark blotches
-        const crispFactor = smoothstep(3.5, 14, gMag + dog * 0.6);
-        const valleyThresh = (7.5 + filterNorm * 9.5) * (1 - fd * 0.38) * (1 + bgSuppress * 1.4);
-        const valleyInk = smoothstep(valleyThresh, valleyThresh * 2.3 + 8, dog) * crispFactor;
-
-        const gradThresh = (15 + filterNorm * 19) * (1 - fd * 0.30) * (1 + bgSuppress * 1.2);
-        const gradInk = smoothstep(gradThresh, gradThresh * 2.1 + 11, gMag) * 0.78;
-
-        lineInkField[q] = Math.max(valleyInk, gradInk);
-    }
-
-    // ---------- 2. Macro Grid (`size x size`) Sampling & Quantization ----------
-    const pad = 3;
+    // 4. Global grid coordinates (aligned to originX, originY for seamless tiled export)
+    const pad = 2;
     const gx0 = Math.floor(originX / size) * size - pad * size;
     const gy0 = Math.floor(originY / size) * size - pad * size;
     const gridW = Math.ceil((originX + w - gx0) / size) + pad;
     const gridH = Math.ceil((originY + h - gy0) / size) + pad;
     const nCells = gridW * gridH;
 
-    const rawR = new Float32Array(nCells);
-    const rawG = new Float32Array(nCells);
-    const rawB = new Float32Array(nCells);
-    const cellFace = new Float32Array(nCells);
-    const cellDetail = new Float32Array(nCells);
+    const cellR = new Uint8ClampedArray(nCells);
+    const cellG = new Uint8ClampedArray(nCells);
+    const cellB = new Uint8ClampedArray(nCells);
 
-    const half = (size - 1) * 0.5;
-    const invSigma = 1 / Math.max(1, size * 0.55);
+    // Reusable buffers for block median & dominant-color counting
+    const maxBlockLen = size * size;
+    const lumArr = new Float32Array(maxBlockLen);
+    const idxArr = new Int32Array(maxBlockLen);
+    const keyCounts = new Map<number, number>();
+    const dominantThreshold = 0.05 + (1 - dominantNorm) * 0.55;
 
     for (let gy = 0; gy < gridH; gy++) {
         const sy = gy0 + gy * size - originY;
@@ -215,237 +250,185 @@ export function pixel(
             const xStart = Math.max(0, Math.min(w - 1, sx));
             const xEnd = Math.max(xStart + 1, Math.min(w, sx + size));
 
-            let meanL = 0, wSum = 0, fSum = 0, maxDet = 0;
-            for (let yy = yStart; yy < yEnd; yy++) {
-                const dy = (yy - sy - half) * invSigma;
-                for (let xx = xStart; xx < xEnd; xx++) {
-                    const dx = (xx - sx - half) * invSigma;
-                    const sw = 1 / (1 + dx * dx + dy * dy);
-                    const q = yy * w + xx;
-                    meanL += lum[q] * sw;
-                    fSum += Math.min(1, featureDensity[q] * 3.8) * sw;
-                    if (detailField[q] > maxDet) maxDet = detailField[q];
-                    wSum += sw;
-                }
-            }
-            meanL /= wSum || 1;
-            fSum /= wSum || 1;
+            let sumR = 0;
+            let sumG = 0;
+            let sumB = 0;
+            let edgeStrength = 0;
+            let cnt = 0;
+            keyCounts.clear();
 
-            let r = 0, g = 0, b = 0, total = 0;
             for (let yy = yStart; yy < yEnd; yy++) {
-                const dy = (yy - sy - half) * invSigma;
+                const row = yy * w;
                 for (let xx = xStart; xx < xEnd; xx++) {
-                    const dx = (xx - sx - half) * invSigma;
-                    const q = yy * w + xx, i = q * 4;
-                    const lDiff = (lum[q] - meanL) / 30;
-                    const wt = 1 / ((1 + dx * dx + dy * dy) * (1 + lDiff * lDiff));
-                    r += src[i] * wt;
-                    g += src[i + 1] * wt;
-                    b += src[i + 2] * wt;
-                    total += wt;
+                    const q = row + xx;
+                    const i = q * 4;
+                    const r = cleaned[i];
+                    const g = cleaned[i + 1];
+                    const b = cleaned[i + 2];
+
+                    sumR += r;
+                    sumG += g;
+                    sumB += b;
+
+                    if (edgeMap[q] > edgeStrength) {
+                        edgeStrength = edgeMap[q];
+                    }
+
+                    // pixel-mosaic luminance formula for median sorting
+                    lumArr[cnt] = 0.299 * r + 0.587 * g + 0.114 * b;
+                    idxArr[cnt] = q;
+                    cnt++;
+
+                    const k = quantKey[q];
+                    keyCounts.set(k, (keyCounts.get(k) ?? 0) + 1);
                 }
             }
-            const c = gy * gridW + gx;
-            rawR[c] = r / total;
-            rawG[c] = g / total;
-            rawB[c] = b / total;
-            cellFace[c] = fSum;
-            cellDetail[c] = maxDet;
+
+            const avgR = sumR / cnt;
+            const avgG = sumG / cnt;
+            const avgB = sumB / cnt;
+
+            // unfake.py: downscale_by_dominant_color
+            let bestKey = -1;
+            let bestCount = 0;
+            for (const [k, c] of keyCounts) {
+                if (c > bestCount) {
+                    bestCount = c;
+                    bestKey = k;
+                }
+            }
+
+            let domR = avgR;
+            let domG = avgG;
+            let domB = avgB;
+            if (bestKey >= 0 && bestCount / cnt >= dominantThreshold && dominantNorm > 0.01) {
+                const dr = (bestKey >> 16) & 0xff;
+                const dg = (bestKey >> 8) & 0xff;
+                const db = bestKey & 0xff;
+                domR = avgR + (dr - avgR) * dominantNorm;
+                domG = avgG + (dg - avgG) * dominantNorm;
+                domB = avgB + (db - avgB) * dominantNorm;
+            }
+
+            let finalR = domR;
+            let finalG = domG;
+            let finalB = domB;
+
+            // pixel-mosaic: renderEdgeAwarePixels blends average/dominant with luminance-sorted median on edges
+            if (edgeStrength > 0 && edgeSharpness > 0) {
+                // Find luminance-sorted median pixel index
+                const subIdx = idxArr.subarray(0, cnt);
+                // Simple insertion sort on small block (cnt <= 400, typically 25..36)
+                for (let a = 1; a < cnt; a++) {
+                    const keyL = lumArr[a];
+                    const keyI = subIdx[a];
+                    let b = a - 1;
+                    while (b >= 0 && lumArr[b] > keyL) {
+                        lumArr[b + 1] = lumArr[b];
+                        subIdx[b + 1] = subIdx[b];
+                        b--;
+                    }
+                    lumArr[b + 1] = keyL;
+                    subIdx[b + 1] = keyI;
+                }
+                const medQ = subIdx[cnt >> 1];
+                const medI = medQ * 4;
+                const medR = cleaned[medI];
+                const medG = cleaned[medI + 1];
+                const medB = cleaned[medI + 2];
+
+                const blend = edgeSharpness * edgeStrength;
+                finalR = domR + (medR - domR) * blend;
+                finalG = domG + (medG - domG) * blend;
+                finalB = domB + (medB - domB) * blend;
+            }
+
+            // pixel-mosaic: adjustContrast + final quantization snap
+            const cr = clamp(Math.round((finalR - 128) * contrastFactor + 128));
+            const cg = clamp(Math.round((finalG - 128) * contrastFactor + 128));
+            const cb = clamp(Math.round((finalB - 128) * contrastFactor + 128));
+            const pq = quantizePerceptualColor(cr, cg, cb, colorCount);
+
+            const mc = gy * gridW + gx;
+            cellR[mc] = pq.r;
+            cellG[mc] = pq.g;
+            cellB[mc] = pq.b;
         }
     }
 
-    // Macro cell bilateral speckle filter (cleans up background concrete/foliage noise)
-    const smoothR = new Float32Array(nCells);
-    const smoothG = new Float32Array(nCells);
-    const smoothB = new Float32Array(nCells);
-    const smoothL = new Float32Array(nCells);
-    const rangeSigma = 10 + filterNorm * 28;
-    const spatialBlend = 0.15 + filterNorm * 0.75;
+    // 5. unfake.py: post-downscale isolated speck / jaggy cleanup on the pixel grid
+    const outCellR = new Uint8ClampedArray(cellR);
+    const outCellG = new Uint8ClampedArray(cellG);
+    const outCellB = new Uint8ClampedArray(cellB);
 
-    for (let gy = 0; gy < gridH; gy++) {
-        for (let gx = 0; gx < gridW; gx++) {
-            const c = gy * gridW + gx;
-            const cr = rawR[c], cg = rawG[c], cb = rawB[c];
-            let sr = cr * 2, sg = cg * 2, sb = cb * 2, wtSum = 2;
-            for (let dy = -1; dy <= 1; dy++) {
-                const ny = Math.max(0, Math.min(gridH - 1, gy + dy));
-                for (let dx = -1; dx <= 1; dx++) {
-                    if (dx === 0 && dy === 0) continue;
-                    const nc = ny * gridW + Math.max(0, Math.min(gridW - 1, gx + dx));
-                    const dist = Math.abs(rawR[nc] - cr) + Math.abs(rawG[nc] - cg) + Math.abs(rawB[nc] - cb);
-                    const wt = spatialBlend * (dx === 0 || dy === 0 ? 1 : 0.5) * Math.exp(-((dist / rangeSigma) ** 2));
-                    sr += rawR[nc] * wt;
-                    sg += rawG[nc] * wt;
-                    sb += rawB[nc] * wt;
-                    wtSum += wt;
+    if (cleanupBlend > 0.15) {
+        for (let gy = 1; gy < gridH - 1; gy++) {
+            for (let gx = 1; gx < gridW - 1; gx++) {
+                const mc = gy * gridW + gx;
+                const r0 = cellR[mc];
+                const g0 = cellG[mc];
+                const b0 = cellB[mc];
+
+                // Check 4 orthogonal neighbors (unfake.py jaggy_cleaner style)
+                const orth = [mc - gridW, mc + gridW, mc - 1, mc + 1];
+                let orthMatch = 0;
+                for (const nc of orth) {
+                    if (cellR[nc] === r0 && cellG[nc] === g0 && cellB[nc] === b0) {
+                        orthMatch++;
+                    }
                 }
-            }
-            smoothR[c] = sr / wtSum;
-            smoothG[c] = sg / wtSum;
-            smoothB[c] = sb / wtSum;
-            smoothL[c] = luminance(smoothR[c], smoothG[c], smoothB[c]);
-        }
-    }
-
-    const macroR = new Float32Array(nCells);
-    const macroG = new Float32Array(nCells);
-    const macroB = new Float32Array(nCells);
-    for (let c = 0; c < nCells; c++) {
-        const [qr, qg, qb] = quantizeOklabColor(smoothR[c], smoothG[c], smoothB[c], levels, cellFace[c]);
-        macroR[c] = qr;
-        macroG[c] = qg;
-        macroB[c] = qb;
-    }
-
-    // ---------- 3. Fine Sub-Grid (`fineSize x fineSize`) for Adaptive Detail & 2D Lines ----------
-    const fPad = 2;
-    const fx0 = Math.floor(originX / fineSize) * fineSize - fPad * fineSize;
-    const fy0 = Math.floor(originY / fineSize) * fineSize - fPad * fineSize;
-    const fGridW = Math.ceil((originX + w - fx0) / fineSize) + fPad;
-    const fGridH = Math.ceil((originY + h - fy0) / fineSize) + fPad;
-    const nFine = fGridW * fGridH;
-
-    const fineR = new Float32Array(nFine);
-    const fineG = new Float32Array(nFine);
-    const fineB = new Float32Array(nFine);
-    const fineDetail = new Float32Array(nFine);
-    const fineInk = new Float32Array(nFine);
-
-    for (let fy = 0; fy < fGridH; fy++) {
-        const sy = fy0 + fy * fineSize - originY;
-        const yStart = Math.max(0, Math.min(h - 1, sy));
-        const yEnd = Math.max(yStart + 1, Math.min(h, sy + fineSize));
-        for (let fx = 0; fx < fGridW; fx++) {
-            const sx = fx0 + fx * fineSize - originX;
-            const xStart = Math.max(0, Math.min(w - 1, sx));
-            const xEnd = Math.max(xStart + 1, Math.min(w, sx + fineSize));
-
-            let rSum = 0, gSum = 0, bSum = 0, wSum = 0;
-            let maxInk = 0, sumInk = 0, maxDet = 0, faceAvg = 0, count = 0;
-            for (let yy = yStart; yy < yEnd; yy++) {
-                for (let xx = xStart; xx < xEnd; xx++) {
-                    const q = yy * w + xx, i = q * 4;
-                    const ink = lineInkField[q];
-                    const wt = 1 + ink * 2.5;
-                    rSum += src[i] * wt;
-                    gSum += src[i + 1] * wt;
-                    bSum += src[i + 2] * wt;
-                    wSum += wt;
-                    if (ink > maxInk) maxInk = ink;
-                    sumInk += ink;
-                    if (detailField[q] > maxDet) maxDet = detailField[q];
-                    faceAvg += Math.min(1, featureDensity[q] * 3.8);
-                    count++;
-                }
-            }
-            const fc = fy * fGridW + fx;
-            const mr = rSum / wSum, mg = gSum / wSum, mb = bSum / wSum;
-            const fNorm = faceAvg / (count || 1);
-            const [qr, qg, qb] = quantizeOklabColor(mr, mg, mb, levels, fNorm);
-            fineR[fc] = qr;
-            fineG[fc] = qg;
-            fineB[fc] = qb;
-            fineDetail[fc] = maxDet;
-            fineInk[fc] = maxInk * 0.65 + (sumInk / (count || 1)) * 0.35;
-        }
-    }
-
-    // ---------- 4. Composite Macro Pixel Blocks + Adaptive Fine Detail + 2D Pixel Lines ----------
-    const edgeJump = (c1: number, c2: number): number => {
-        const lumDiff = Math.abs(smoothL[c1] - smoothL[c2]);
-        const colDiff = (
-            Math.abs(smoothR[c1] - smoothR[c2]) +
-            Math.abs(smoothG[c1] - smoothG[c2]) +
-            Math.abs(smoothB[c1] - smoothB[c2])
-        ) * 0.22;
-        const avgLum = (smoothL[c1] + smoothL[c2]) * 0.5;
-        const skyDamp = avgLum > 170 ? (avgLum - 170) * 0.25 : 0;
-        return lumDiff * 0.85 + colDiff - skyDamp;
-    };
-
-    const macroEdgeThresh = 24 + filterNorm * 32;
-    const strokePx = fineSize;
-
-    const out = new Uint8ClampedArray(src.length);
-    for (let y = 0; y < h; y++) {
-        const wy = originY + y - gy0;
-        const gy = Math.floor(wy / size);
-        const localY = wy - gy * size;
-        const mRow = gy * gridW;
-
-        const fwy = originY + y - fy0;
-        const fy = Math.floor(fwy / fineSize);
-        const fRow = fy * fGridW;
-
-        for (let x = 0; x < w; x++) {
-            const wx = originX + x - gx0;
-            const gx = Math.floor(wx / size);
-            const localX = wx - gx * size;
-            const mc = mRow + gx;
-
-            const fwx = originX + x - fx0;
-            const fx = Math.floor(fwx / fineSize);
-            const fc = fRow + fx;
-
-            // Adaptive blend between macro `size x size` block and fine `fineSize x fineSize` block
-            const det = Math.max(cellDetail[mc] * 0.35, fineDetail[fc]);
-            const subMix = smoothstep(0.28, 0.72, det);
-
-            let r = macroR[mc] + (fineR[fc] - macroR[mc]) * subMix;
-            let g = macroG[mc] + (fineG[fc] - macroG[mc]) * subMix;
-            let b = macroB[mc] + (fineB[fc] - macroB[mc]) * subMix;
-
-            if (inkStrength > 0.001) {
-                let blockEdge = 0;
-                if (gx > 0 && gy > 0 && gx < gridW - 1 && gy < gridH - 1) {
-                    const lC = smoothL[mc];
-                    const cL = mc - 1, cR = mc + 1, cU = mc - gridW, cD = mc + gridW;
-                    const jL = lC <= smoothL[cL] ? edgeJump(mc, cL) : 0;
-                    const jR = lC < smoothL[cR] ? edgeJump(mc, cR) : 0;
-                    const jU = lC <= smoothL[cU] ? edgeJump(mc, cU) : 0;
-                    const jD = lC < smoothL[cD] ? edgeJump(mc, cD) : 0;
-
-                    const onLeft = localX < strokePx ? jL : 0;
-                    const onRight = localX >= size - strokePx ? jR : 0;
-                    const onTop = localY < strokePx ? jU : 0;
-                    const onBottom = localY >= size - strokePx ? jD : 0;
-
-                    let diagScore = 0;
-                    if (localX < strokePx && localY < strokePx && lC <= smoothL[mc - gridW - 1]) {
-                        const topHasLeft = smoothL[cU] <= smoothL[mc - gridW - 1] ? edgeJump(cU, mc - gridW - 1) : 0;
-                        const leftHasTop = smoothL[cL] <= smoothL[mc - gridW - 1] ? edgeJump(cL, mc - gridW - 1) : 0;
-                        if (topHasLeft > macroEdgeThresh && leftHasTop > macroEdgeThresh) {
-                            diagScore = Math.min(topHasLeft, leftHasTop);
+                if (orthMatch === 0) {
+                    // Find dominant neighbor color in 3x3 if strongly uniform
+                    let bestN = -1;
+                    let bestVotes = 0;
+                    for (let oy = -1; oy <= 1; oy++) {
+                        for (let ox = -1; ox <= 1; ox++) {
+                            if (ox === 0 && oy === 0) continue;
+                            const nc = (gy + oy) * gridW + (gx + ox);
+                            const nr = cellR[nc];
+                            const ng = cellG[nc];
+                            const nb = cellB[nc];
+                            let votes = 0;
+                            for (let py = -1; py <= 1; py++) {
+                                for (let px = -1; px <= 1; px++) {
+                                    if (px === 0 && py === 0) continue;
+                                    const pc = (gy + py) * gridW + (gx + px);
+                                    if (cellR[pc] === nr && cellG[pc] === ng && cellB[pc] === nb) {
+                                        votes++;
+                                    }
+                                }
+                            }
+                            if (votes > bestVotes) {
+                                bestVotes = votes;
+                                bestN = nc;
+                            }
                         }
                     }
-
-                    const maxJump = Math.max(onLeft, onRight, onTop, onBottom, diagScore);
-                    if (maxJump > macroEdgeThresh) {
-                        blockEdge = smoothstep(macroEdgeThresh * 0.9, macroEdgeThresh + 26, maxJump) * (1 - cellFace[mc] * 0.85);
+                    if (bestVotes >= 5 && bestN >= 0) {
+                        outCellR[mc] = cellR[bestN];
+                        outCellG[mc] = cellG[bestN];
+                        outCellB[mc] = cellB[bestN];
                     }
                 }
-
-                const fineLine = fineInk[fc];
-                const combinedEdge = Math.max(blockEdge, fineLine) * inkStrength;
-
-                if (combinedEdge > 0.01) {
-                    // Selective outline (Sel-Out): deep hue-tinted illustration ink
-                    const inkR = r * 0.17 + 9;
-                    const inkG = g * 0.15 + 9;
-                    const inkB = b * 0.22 + 15;
-                    const mix = Math.min(0.92, combinedEdge * 0.9);
-                    r += (inkR - r) * mix;
-                    g += (inkG - g) * mix;
-                    b += (inkB - b) * mix;
-                }
             }
+        }
+    }
 
+    // 6. Write crisp rectangular pixel blocks aligned to global origin
+    const out = new Uint8ClampedArray(src.length);
+    for (let y = 0; y < h; y++) {
+        const gy = Math.floor((originY + y - gy0) / size);
+        const mRow = gy * gridW;
+        for (let x = 0; x < w; x++) {
+            const gx = Math.floor((originX + x - gx0) / size);
+            const mc = mRow + gx;
             const i = (y * w + x) * 4;
-            out[i] = clamp(Math.round(r));
-            out[i + 1] = clamp(Math.round(g));
-            out[i + 2] = clamp(Math.round(b));
+            out[i] = outCellR[mc];
+            out[i + 1] = outCellG[mc];
+            out[i + 2] = outCellB[mc];
             out[i + 3] = 255;
         }
     }
+
     return out;
 }

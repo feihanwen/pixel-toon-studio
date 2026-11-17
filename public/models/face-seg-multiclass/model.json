@@ -1,0 +1,35 @@
+{
+  "id": "face-seg-multiclass",
+  "version": "1.0.0",
+  "file": "model.onnx",
+  "sha256": "13961350bb2099688eb96182ffe26f24eb12c77b1df278a2ec95bbdc923136e1",
+  "bytes": 16454497,
+  "inputSize": 256,
+  "layout": "NHWC",
+  "channels": "RGB",
+  "classes": [
+    "background",
+    "hair",
+    "body_skin",
+    "face_skin",
+    "clothes",
+    "others"
+  ],
+  "license": "Apache-2.0",
+  "operators": [
+    "Add",
+    "Conv",
+    "ConvTranspose",
+    "Mul",
+    "ReduceSum",
+    "Relu",
+    "Reshape",
+    "Resize",
+    "Softmax",
+    "Transpose"
+  ],
+  "inputName": "input_29",
+  "outputName": "Identity",
+  "sourceUrl": "https://huggingface.co/FreeHugsForRobots/ps-skin-seg/resolve/main/selfie_multiclass_256x256.onnx",
+  "author": "Google MediaPipe"
+}

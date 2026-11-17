@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { composeFrame, frameInfo, type FrameContent } from '../imaging/frame';
 import { usePreferences } from '../config/preferences';
 import { uiText } from '../config/i18n';
+import type { MosaicPoint, MosaicStroke } from '../types/mosaic';
+import type { MosaicToolMode } from './MosaicPanel';
 
 interface Props {
     heading: ReactNode;
@@ -14,6 +16,9 @@ interface Props {
     content: FrameContent;
     showOriginal: boolean;
     processing: boolean;
+    mosaicTool?: MosaicToolMode;
+    mosaicBrushSize?: number;
+    onMosaicStroke?: (stroke: MosaicStroke) => void;
 }
 
 export function CanvasStage({
@@ -27,13 +32,20 @@ export function CanvasStage({
     content,
     showOriginal,
     processing,
+    mosaicTool = null,
+    mosaicBrushSize = 36,
+    onMosaicStroke,
 }: Props) {
     const { language } = usePreferences();
     const t = uiText(language);
     const before = useRef<HTMLCanvasElement>(null);
     const after = useRef<HTMLCanvasElement>(null);
+    const overlay = useRef<HTMLCanvasElement>(null);
     const [split, setSplit] = useState(0.5);
     const dragging = useRef(false);
+    const painting = useRef(false);
+    const strokePoints = useRef<MosaicPoint[]>([]);
+    const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
     const [view, setView] = useState<'effect' | 'compare' | 'original'>('effect');
 
     useEffect(() => {
@@ -86,8 +98,100 @@ export function CanvasStage({
     const right = ((layout.width - layout.x - layout.photoWidth * split) / layout.width) * 100;
     const top = (layout.y / layout.height) * 100;
     const bottom = ((layout.height - layout.y - layout.photoHeight) / layout.height) * 100;
+    const stageHeight = previewWidth > 0 ? (previewWidth * layout.height) / layout.width : 0;
+    const normRadius = Math.max(0.008, mosaicBrushSize / 600);
+    const cssBrushRadius =
+        previewWidth > 0
+            ? normRadius * Math.min(layout.photoWidth, layout.photoHeight) * (previewWidth / layout.width)
+            : 16;
+
+    function pointerToNorm(e: React.PointerEvent): MosaicPoint | null {
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        const cx = ((e.clientX - rect.left) * layout.width) / rect.width;
+        const cy = ((e.clientY - rect.top) * layout.height) / rect.height;
+        const nx = (cx - layout.x) / layout.photoWidth;
+        const ny = (cy - layout.y) / layout.photoHeight;
+        return {
+            x: Math.max(0, Math.min(1, nx)),
+            y: Math.max(0, Math.min(1, ny)),
+        };
+    }
+
+    function drawLiveOverlay(points: MosaicPoint[]) {
+        const canvas = overlay.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!points.length) return;
+        const rPx = Math.max(4, normRadius * Math.min(canvas.width, canvas.height));
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = rPx * 2;
+        ctx.strokeStyle = mosaicTool === 'erase' ? 'rgba(255, 110, 110, 0.36)' : 'rgba(92, 178, 255, 0.38)';
+        ctx.fillStyle = ctx.strokeStyle;
+        if (points.length === 1) {
+            ctx.beginPath();
+            ctx.arc(points[0].x * canvas.width, points[0].y * canvas.height, rPx, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x * canvas.width, points[0].y * canvas.height);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x * canvas.width, points[i].y * canvas.height);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function clearLiveOverlay() {
+        const canvas = overlay.current;
+        const ctx = canvas?.getContext('2d');
+        if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function finishStroke() {
+        if (!painting.current) return;
+        painting.current = false;
+        const pts = strokePoints.current;
+        strokePoints.current = [];
+        clearLiveOverlay();
+        if (pts.length > 0 && mosaicTool && onMosaicStroke) {
+            onMosaicStroke({ mode: mosaicTool, radius: normRadius, points: pts });
+        }
+    }
+
+    function handleStagePointerDown(e: React.PointerEvent) {
+        if (!mosaicTool || e.button !== 0) return;
+        const pt = pointerToNorm(e);
+        if (!pt) return;
+        e.preventDefault();
+        if (view === 'original') setView('effect');
+        painting.current = true;
+        strokePoints.current = [pt];
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drawLiveOverlay(strokePoints.current);
+    }
 
     function move(e: React.PointerEvent) {
+        if (mosaicTool) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            if (painting.current) {
+                const pt = pointerToNorm(e);
+                if (pt) {
+                    const last = strokePoints.current[strokePoints.current.length - 1];
+                    if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 0.004) {
+                        strokePoints.current.push(pt);
+                        drawLiveOverlay(strokePoints.current);
+                    }
+                }
+            }
+            return;
+        }
         if (!dragging.current) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const x = ((e.clientX - rect.left) * layout.width) / rect.width;
@@ -119,21 +223,55 @@ export function CanvasStage({
             </div>
             <div className="stage-viewport" ref={viewport}>
                 <div
-                    className="stage-inner"
+                    className={`stage-inner${mosaicTool ? ' is-painting' : ''}`}
                     style={{
                         width: previewWidth,
-                        height: (previewWidth * layout.height) / layout.width,
+                        height: stageHeight,
                     }}
+                    onPointerDown={handleStagePointerDown}
                     onPointerMove={move}
+                    onPointerLeave={() => {
+                        if (!painting.current) setCursorPos(null);
+                    }}
                     onPointerUp={e => {
+                        if (painting.current) {
+                            finishStroke();
+                        }
                         dragging.current = false;
-                        e.currentTarget.releasePointerCapture(e.pointerId);
+                        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                            e.currentTarget.releasePointerCapture(e.pointerId);
+                        }
                     }}
                     onPointerCancel={() => {
+                        finishStroke();
                         dragging.current = false;
                     }}
                 >
                     <canvas ref={after} className="stage-canvas" aria-label={t.processedCanvasAria} />
+                    <canvas
+                        ref={overlay}
+                        width={Math.max(1, Math.round(layout.photoWidth))}
+                        height={Math.max(1, Math.round(layout.photoHeight))}
+                        className="mosaic-overlay-canvas"
+                        style={{
+                            left: `${left}%`,
+                            top: `${top}%`,
+                            width: `${(layout.photoWidth / layout.width) * 100}%`,
+                            height: `${(layout.photoHeight / layout.height) * 100}%`,
+                        }}
+                    />
+                    {mosaicTool && cursorPos && (
+                        <div
+                            className={`mosaic-brush-cursor${mosaicTool === 'erase' ? ' is-erase' : ''}`}
+                            style={{
+                                left: cursorPos.x,
+                                top: cursorPos.y,
+                                width: cssBrushRadius * 2,
+                                height: cssBrushRadius * 2,
+                            }}
+                            aria-hidden="true"
+                        />
+                    )}
                     <canvas
                         ref={before}
                         className="stage-canvas"

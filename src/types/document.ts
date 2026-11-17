@@ -1,9 +1,11 @@
 import type { GlobalKey, ParamsByStyle, StyleId } from '../config/styles';
 import type { FrameStyleId } from '../config/frames';
 import type { EnhancementSelection } from './enhancement';
+import type { MosaicSelection } from './mosaic';
 export interface EditorSnapshot {
     autoColor: import('../imaging/autoColor').AutoColorSelection;
     enhancement: EnhancementSelection;
+    mosaic?: MosaicSelection;
     styleId: StyleId;
     params: ParamsByStyle;
     global: Record<GlobalKey, number>;

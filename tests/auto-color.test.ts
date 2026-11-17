@@ -68,4 +68,22 @@ describe('gentle color v2', () => {
         expect(full).toEqual(pieces);
         const zero = input.slice(); applyAutoColor(zero, { ...plan, strength: 0 }); expect(zero).toEqual(input);
     });
+    it('supports presets, user tuning offsets, bidirectional exposure recovery, and diagnostics', () => {
+        const bright = pixels(Array.from({ length: 256 }, (_, i) => { const v = Math.round(130 + (i / 255) * 115); return [v, v, v]; }));
+        const brightPlan = analyzeAutoColor(bright, 100, 2);
+        expect(brightPlan.gamma).toBeGreaterThan(1);
+        expect(brightPlan.diagnostics?.exposureNote).toBe('recovered');
+        const brightOut = bright.slice(); applyAutoColor(brightOut, brightPlan);
+        expect(brightOut[128 * 4]).toBeLessThan(bright[128 * 4]);
+
+        const sample = pixels(Array.from({ length: 256 }, (_, i) => [Math.min(255, i + 10), i, Math.max(0, i - 10)]));
+        const warmOut = sample.slice(); applyAutoColor(warmOut, analyzeAutoColor(sample, 100, 2, { temperature: 30 }));
+        const coolOut = sample.slice(); applyAutoColor(coolOut, analyzeAutoColor(sample, 100, 2, { temperature: -30 }));
+        expect(warmOut[128 * 4] - warmOut[128 * 4 + 2]).toBeGreaterThan(coolOut[128 * 4] - coolOut[128 * 4 + 2]);
+
+        const base = initialSnapshot();
+        base.autoColor = { enabled: true, strength: 80, algorithmVersion: 2, exposure: 15, contrast: 20, temperature: -10, vibrance: 25 };
+        const restored = normalizeHistory({ entries: [base], cursor: 0 }).entries[0];
+        expect(restored.autoColor).toEqual(base.autoColor);
+    });
 });

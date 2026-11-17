@@ -1,4 +1,4 @@
-import type { EnhancementResult, EnhancementTask, TaskStatus } from '../types/enhancement';
+import type { EnhancementBackendMode, EnhancementResult, EnhancementTask, TaskStatus } from '../types/enhancement';
 import type { PhotoTab } from '../types/document';
 import { AI_TIMEOUT, cacheKey, digest, transition } from './domain';
 import { disposeLocalEngines, enhanceLocal } from './local/LocalEnhancerClient';
@@ -9,7 +9,7 @@ import { getLanguage } from '../config/preferences';
 const running = new Map<string, AbortController>();
 export const cancelEnhancement = (tabId: string) => running.get(tabId)?.abort();
 export const cancelAllEnhancements = () => { for (const controller of running.values()) controller.abort(); disposeLocalEngines(); };
-export interface EnhancementRequest { force: boolean; localProfile?: LocalProfile }
+export interface EnhancementRequest { force: boolean; localProfile?: LocalProfile; backendMode?: EnhancementBackendMode }
 export async function runEnhancement(tab: PhotoTab, request: EnhancementRequest, update: (task: EnhancementTask) => void,
     complete: (result: EnhancementResult, persisted: boolean) => void, protectedIds: Set<string>) {
     if (running.has(tab.id)) return;
@@ -29,7 +29,7 @@ export async function runEnhancement(tab: PhotoTab, request: EnhancementRequest,
         signal.throwIfAborted();
         if (cached) { emit('succeeded', en ? 'Restored from local enhancement cache' : '已复用本机增强缓存', 100); complete(cached, true); return; }
         emit('processing', en ? `Preparing ${model.label}…` : `正在准备${model.label}…`, 0);
-        const output = await enhanceLocal(tab.blob, signal, (progress, message) => emit('processing', message, progress), profile);
+        const output = await enhanceLocal(tab.blob, signal, (progress, message) => emit('processing', message, progress), profile, request.backendMode === 'wasm');
         signal.throwIfAborted();
         emit('saving', en ? 'Saving local enhancement result…' : '正在保存本地增强结果…', 100);
         const result: EnhancementResult = { ...output, id: crypto.randomUUID(), cacheKey: hash, sourceDigest,
