@@ -5,7 +5,7 @@
   <p><strong>Transform everyday photos into anime stills, painted artworks, or vintage postcards.</strong></p>
   <p>100% on-device · Zero setup · Zero uploads · Privacy-first · No API keys required</p>
   <p>
-    <a href="https://pixelstudio-y.vercel.app/"><strong>🌐 Try Live Web Demo (pixelstudio-y.vercel.app)</strong></a>
+    <a href="https://pixelstudio-g.vercel.app/"><strong>🌐 Try Live Web Demo (pixelstudio-y.vercel.app)</strong></a>
   </p>
   <p>
     <a href="#feature-overview">Features</a>
