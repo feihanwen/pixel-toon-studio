@@ -4,16 +4,19 @@ import { usePreferences } from '../config/preferences';
 import { uiText } from '../config/i18n';
 import type { MosaicPoint, MosaicStroke } from '../types/mosaic';
 import type { MosaicToolMode } from './MosaicPanel';
+import { StudioIcon } from './StudioIcon';
 import {
     INITIAL_STAGE_TRANSFORM,
     MAX_STAGE_ZOOM,
     MIN_STAGE_ZOOM,
     clampStagePan,
+    panAndZoomStage,
     wheelZoomFactor,
     zoomStageByFactor,
     zoomStageTo,
     type StageBounds,
     type StageTransform,
+    type ZoomAnchor,
 } from './stageZoom';
 
 interface Props {
@@ -31,6 +34,10 @@ interface Props {
     mosaicBrushSize?: number;
     onMosaicStroke?: (stroke: MosaicStroke) => void;
 }
+
+const COMPARE_GAP = 12;
+const DOUBLE_TAP_ZOOM = 2.2;
+type StageViewMode = 'effect' | 'split' | 'sideBySide';
 
 export function CanvasStage({
     heading,
@@ -52,31 +59,55 @@ export function CanvasStage({
     const before = useRef<HTMLCanvasElement>(null);
     const after = useRef<HTMLCanvasElement>(null);
     const overlay = useRef<HTMLCanvasElement>(null);
+    const mosaicSurfaceRef = useRef<HTMLDivElement>(null);
     const [split, setSplit] = useState(0.5);
     const [transform, setTransform] = useState<StageTransform>(INITIAL_STAGE_TRANSFORM);
+    const transformRef = useRef<StageTransform>(INITIAL_STAGE_TRANSFORM);
+    transformRef.current = transform;
     const { zoom, pan } = transform;
     const [isPanning, setIsPanning] = useState(false);
+    const [touchInputDetected, setTouchInputDetected] = useState(() =>
+        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+            ? window.matchMedia('(pointer: coarse)').matches
+            : false,
+    );
     const dragging = useRef(false);
     const painting = useRef(false);
     const panning = useRef(false);
     const panOrigin = useRef({ clientX: 0, clientY: 0, panX: 0, panY: 0 });
     const touchPointers = useRef(new Map<number, { x: number; y: number }>());
-    const pinchDist = useRef<number | null>(null);
+    const pinchState = useRef<{ dist: number; midX: number; midY: number } | null>(null);
+    const pinchAnchorEl = useRef<Element | null>(null);
+    const wasMultiTouch = useRef(false);
+    const tapCandidate = useRef<{
+        id: number;
+        startX: number;
+        startY: number;
+        startTime: number;
+        moved: boolean;
+        anchorEl: Element | null;
+    } | null>(null);
+    const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+    const lastTouchEndTime = useRef(0);
     const boundsRef = useRef<StageBounds>({ previewWidth: 0, stageHeight: 0, availableWidth: 0, availableHeight: 0 });
     const strokePoints = useRef<MosaicPoint[]>([]);
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
-    const [view, setView] = useState<'effect' | 'compare' | 'original'>('effect');
+    const [view, setView] = useState<StageViewMode>('effect');
 
     useEffect(() => {
         setView('effect');
         setSplit(0.5);
         setTransform(INITIAL_STAGE_TRANSFORM);
         touchPointers.current.clear();
-        pinchDist.current = null;
+        pinchState.current = null;
+        pinchAnchorEl.current = null;
+        wasMultiTouch.current = false;
+        tapCandidate.current = null;
     }, [original, resultKey]);
 
-    const originalVisible = showOriginal || view === 'original';
-    const comparing = !showOriginal && view === 'compare';
+    const sideBySide = view === 'sideBySide';
+    const originalVisible = showOriginal && !sideBySide;
+    const comparing = !showOriginal && view === 'split';
     const layout = frameInfo(width, height, frameEnabled);
     const viewport = useRef<HTMLDivElement>(null);
     const [available, setAvailable] = useState({ width: 0, height: 0 });
@@ -91,7 +122,8 @@ export function CanvasStage({
         return () => observer.disconnect();
     }, []);
 
-    const previewWidth = Math.min(available.width, (available.height * layout.width) / layout.height);
+    const paneMaxWidth = sideBySide ? Math.max(0, (available.width - COMPARE_GAP) / 2) : available.width;
+    const previewWidth = Math.min(paneMaxWidth, (available.height * layout.width) / layout.height);
 
     useEffect(() => {
         if (!original || !before.current || !after.current) return;
@@ -114,6 +146,7 @@ export function CanvasStage({
         content.captionId,
         content.showExif,
         content.exif,
+        view,
     ]);
 
     const left = (layout.x / layout.width) * 100;
@@ -124,23 +157,39 @@ export function CanvasStage({
     boundsRef.current = {
         previewWidth,
         stageHeight,
-        availableWidth: available.width,
+        availableWidth: paneMaxWidth,
         availableHeight: available.height,
     };
+
+    useEffect(() => {
+        setTransform(prev => {
+            const clamped = clampStagePan(prev.pan, prev.zoom, boundsRef.current);
+            if (clamped.x === prev.pan.x && clamped.y === prev.pan.y) return prev;
+            return { zoom: prev.zoom, pan: clamped };
+        });
+    }, [view, previewWidth, stageHeight]);
     const normRadius = Math.max(0.008, mosaicBrushSize / 600);
     const cssBrushRadius =
         previewWidth > 0
             ? normRadius * Math.min(layout.photoWidth, layout.photoHeight) * (previewWidth / layout.width)
             : 16;
 
-    function viewportAnchor(clientX: number, clientY: number) {
-        const el = viewport.current;
+    function resolveAnchorElement(target?: EventTarget | null): Element | null {
+        const pane = target instanceof Element ? target.closest('.stage-compare-pane') : null;
+        return pane ?? viewport.current;
+    }
+
+    function viewportAnchorForEl(clientX: number, clientY: number, el: Element | null): ZoomAnchor | undefined {
         if (!el) return undefined;
         const rect = el.getBoundingClientRect();
         return {
             cx: clientX - (rect.left + rect.width / 2),
             cy: clientY - (rect.top + rect.height / 2),
         };
+    }
+
+    function viewportAnchor(clientX: number, clientY: number, target?: EventTarget | null) {
+        return viewportAnchorForEl(clientX, clientY, resolveAnchorElement(target));
     }
 
     function applyZoom(nextZoomRaw: number) {
@@ -160,7 +209,7 @@ export function CanvasStage({
             e.preventDefault();
             const factor = wheelZoomFactor(e.deltaY, e.deltaMode, e.ctrlKey);
             if (factor === 1) return;
-            const anchor = viewportAnchor(e.clientX, e.clientY);
+            const anchor = viewportAnchor(e.clientX, e.clientY, e.target);
             setTransform(prev => zoomStageByFactor(prev, factor, boundsRef.current, anchor));
         };
 
@@ -171,6 +220,7 @@ export function CanvasStage({
 
         const onGestureChange = (e: Event) => {
             e.preventDefault();
+            if (touchPointers.current.size >= 2) return;
             const ge = e as UIEvent & { scale?: number; clientX?: number; clientY?: number };
             const scale = ge.scale;
             if (!scale || !Number.isFinite(scale) || scale <= 0) return;
@@ -182,7 +232,7 @@ export function CanvasStage({
                 Number.isFinite(ge.clientX) &&
                 Number.isFinite(ge.clientY) &&
                 (ge.clientX !== 0 || ge.clientY !== 0);
-            const anchor = hasCoords ? viewportAnchor(ge.clientX!, ge.clientY!) : undefined;
+            const anchor = hasCoords ? viewportAnchor(ge.clientX!, ge.clientY!, e.target) : undefined;
             setTransform(prev => zoomStageByFactor(prev, factor, boundsRef.current, anchor));
         };
 
@@ -203,17 +253,27 @@ export function CanvasStage({
         };
     }, []);
 
-    function pointerToNorm(e: React.PointerEvent): MosaicPoint | null {
-        const rect = e.currentTarget.getBoundingClientRect();
+    function clientToMosaicNorm(clientX: number, clientY: number, surface: Element | null): MosaicPoint | null {
+        if (!surface) return null;
+        const rect = surface.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return null;
-        const cx = ((e.clientX - rect.left) * layout.width) / rect.width;
-        const cy = ((e.clientY - rect.top) * layout.height) / rect.height;
+        const cx = ((clientX - rect.left) * layout.width) / rect.width;
+        const cy = ((clientY - rect.top) * layout.height) / rect.height;
         const nx = (cx - layout.x) / layout.photoWidth;
         const ny = (cy - layout.y) / layout.photoHeight;
         return {
             x: Math.max(0, Math.min(1, nx)),
             y: Math.max(0, Math.min(1, ny)),
         };
+    }
+
+    function updateSplitAt(clientX: number) {
+        const surface = mosaicSurfaceRef.current;
+        if (!surface) return;
+        const rect = surface.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const x = ((clientX - rect.left) * layout.width) / rect.width;
+        setSplit(Math.max(0, Math.min(1, (x - layout.x) / layout.photoWidth)));
     }
 
     function drawLiveOverlay(points: MosaicPoint[]) {
@@ -262,20 +322,40 @@ export function CanvasStage({
         }
     }
 
-    function releaseTouchPointer(e: React.PointerEvent) {
-        if (e.pointerType !== 'touch') return;
-        touchPointers.current.delete(e.pointerId);
-        if (touchPointers.current.size < 2) {
-            pinchDist.current = null;
+    function captureViewportPointer(pointerId: number) {
+        try {
+            viewport.current?.setPointerCapture(pointerId);
+        } catch {
+            // Ignore synthetic or non-capturable pointers
         }
     }
 
-    function handleStagePointerDown(e: React.PointerEvent) {
+    function releaseViewportPointer(pointerId: number) {
+        try {
+            if (viewport.current?.hasPointerCapture(pointerId)) {
+                viewport.current.releasePointerCapture(pointerId);
+            }
+        } catch {
+            // Ignore release errors
+        }
+    }
+
+    function handleViewportPointerDown(e: React.PointerEvent<HTMLDivElement>) {
         if (e.pointerType === 'touch') {
+            if (!touchInputDetected) setTouchInputDetected(true);
             touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            lastTouchEndTime.current = Date.now();
+
             if (touchPointers.current.size === 2) {
                 const [p1, p2] = Array.from(touchPointers.current.values());
-                pinchDist.current = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                pinchState.current = {
+                    dist: Math.hypot(p2.x - p1.x, p2.y - p1.y),
+                    midX: (p1.x + p2.x) / 2,
+                    midY: (p1.y + p2.y) / 2,
+                };
+                pinchAnchorEl.current = resolveAnchorElement(e.target);
+                wasMultiTouch.current = true;
+                tapCandidate.current = null;
                 if (painting.current) {
                     painting.current = false;
                     strokePoints.current = [];
@@ -284,45 +364,122 @@ export function CanvasStage({
                 panning.current = false;
                 setIsPanning(false);
                 dragging.current = false;
-                e.currentTarget.setPointerCapture(e.pointerId);
+                captureViewportPointer(e.pointerId);
                 return;
             }
+
+            if (touchPointers.current.size === 1) {
+                const targetEl = e.target instanceof Element ? e.target : null;
+                if (comparing && targetEl?.closest('.compare-line')) {
+                    e.preventDefault();
+                    dragging.current = true;
+                    tapCandidate.current = null;
+                    updateSplitAt(e.clientX);
+                    captureViewportPointer(e.pointerId);
+                    return;
+                }
+
+                if (mosaicTool && !wasMultiTouch.current && targetEl && mosaicSurfaceRef.current?.contains(targetEl)) {
+                    const pt = clientToMosaicNorm(e.clientX, e.clientY, mosaicSurfaceRef.current);
+                    if (pt) {
+                        e.preventDefault();
+                        painting.current = true;
+                        strokePoints.current = [pt];
+                        tapCandidate.current = null;
+                        captureViewportPointer(e.pointerId);
+                        drawLiveOverlay(strokePoints.current);
+                        return;
+                    }
+                }
+
+                tapCandidate.current = {
+                    id: e.pointerId,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startTime: Date.now(),
+                    moved: false,
+                    anchorEl: resolveAnchorElement(e.target),
+                };
+                if (transformRef.current.zoom > 1 && !mosaicTool) {
+                    panning.current = true;
+                    setIsPanning(true);
+                    panOrigin.current = {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        panX: transformRef.current.pan.x,
+                        panY: transformRef.current.pan.y,
+                    };
+                }
+                captureViewportPointer(e.pointerId);
+                return;
+            }
+            return;
         }
-        const wantPan = zoom > 1 && ((!mosaicTool && e.button === 0) || e.button === 1 || (mosaicTool && e.altKey));
+
+        const targetEl = e.target instanceof Element ? e.target : null;
+        if (comparing && e.button === 0 && targetEl?.closest('.compare-line')) {
+            e.preventDefault();
+            dragging.current = true;
+            updateSplitAt(e.clientX);
+            captureViewportPointer(e.pointerId);
+            return;
+        }
+
+        const currentZoom = transformRef.current.zoom;
+        const wantPan = currentZoom > 1 && ((!mosaicTool && e.button === 0) || e.button === 1 || (mosaicTool && e.altKey));
         if (wantPan) {
             e.preventDefault();
             panning.current = true;
             setIsPanning(true);
-            panOrigin.current = { clientX: e.clientX, clientY: e.clientY, panX: pan.x, panY: pan.y };
-            e.currentTarget.setPointerCapture(e.pointerId);
+            panOrigin.current = {
+                clientX: e.clientX,
+                clientY: e.clientY,
+                panX: transformRef.current.pan.x,
+                panY: transformRef.current.pan.y,
+            };
+            captureViewportPointer(e.pointerId);
             return;
         }
+
         if (!mosaicTool || e.button !== 0) return;
-        const pt = pointerToNorm(e);
+        if (!targetEl || !mosaicSurfaceRef.current?.contains(targetEl)) return;
+        const pt = clientToMosaicNorm(e.clientX, e.clientY, mosaicSurfaceRef.current);
         if (!pt) return;
         e.preventDefault();
-        if (view === 'original') setView('effect');
         painting.current = true;
         strokePoints.current = [pt];
-        e.currentTarget.setPointerCapture(e.pointerId);
+        captureViewportPointer(e.pointerId);
         drawLiveOverlay(strokePoints.current);
     }
 
-    function move(e: React.PointerEvent) {
+    function handleViewportPointerMove(e: React.PointerEvent<HTMLDivElement>) {
         if (e.pointerType === 'touch' && touchPointers.current.has(e.pointerId)) {
             touchPointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            if (touchPointers.current.size === 2 && pinchDist.current !== null) {
+
+            if (tapCandidate.current?.id === e.pointerId && !tapCandidate.current.moved) {
+                if (Math.hypot(e.clientX - tapCandidate.current.startX, e.clientY - tapCandidate.current.startY) > 8) {
+                    tapCandidate.current.moved = true;
+                }
+            }
+
+            if (touchPointers.current.size === 2 && pinchState.current) {
                 const [p1, p2] = Array.from(touchPointers.current.values());
                 const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                if (dist > 0 && pinchDist.current > 0) {
-                    const factor = dist / pinchDist.current;
-                    pinchDist.current = dist;
-                    const anchor = viewportAnchor((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-                    setTransform(prev => zoomStageByFactor(prev, factor, boundsRef.current, anchor));
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                const prevPinch = pinchState.current;
+                const factor = prevPinch.dist > 0 && dist > 0 ? dist / prevPinch.dist : 1;
+                const anchorEl = pinchAnchorEl.current ?? viewport.current;
+                const prevAnchor = viewportAnchorForEl(prevPinch.midX, prevPinch.midY, anchorEl);
+                const nextAnchor = viewportAnchorForEl(midX, midY, anchorEl);
+                pinchState.current = { dist, midX, midY };
+                if (prevAnchor && nextAnchor) {
+                    setTransform(prev => panAndZoomStage(prev, factor, boundsRef.current, prevAnchor, nextAnchor));
                 }
                 return;
             }
         }
+
         if (panning.current) {
             const dx = e.clientX - panOrigin.current.clientX;
             const dy = e.clientY - panOrigin.current.clientY;
@@ -336,11 +493,22 @@ export function CanvasStage({
             }));
             return;
         }
-        if (mosaicTool) {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setCursorPos({ x: (e.clientX - rect.left) / zoom, y: (e.clientY - rect.top) / zoom });
+
+        if (dragging.current) {
+            updateSplitAt(e.clientX);
+            return;
+        }
+
+        if (mosaicTool && mosaicSurfaceRef.current) {
+            if (e.pointerType !== 'touch' || painting.current) {
+                const rect = mosaicSurfaceRef.current.getBoundingClientRect();
+                setCursorPos({
+                    x: (e.clientX - rect.left) / transformRef.current.zoom,
+                    y: (e.clientY - rect.top) / transformRef.current.zoom,
+                });
+            }
             if (painting.current) {
-                const pt = pointerToNorm(e);
+                const pt = clientToMosaicNorm(e.clientX, e.clientY, mosaicSurfaceRef.current);
                 if (pt) {
                     const last = strokePoints.current[strokePoints.current.length - 1];
                     if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 0.004) {
@@ -349,182 +517,263 @@ export function CanvasStage({
                     }
                 }
             }
-            return;
         }
-        if (!dragging.current) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) * layout.width) / rect.width;
-        setSplit(Math.max(0, Math.min(1, (x - layout.x) / layout.photoWidth)));
     }
+
+    function handleViewportPointerEnd(e: React.PointerEvent<HTMLDivElement>, cancelled: boolean) {
+        if (e.pointerType === 'touch') {
+            lastTouchEndTime.current = Date.now();
+            touchPointers.current.delete(e.pointerId);
+
+            const candidate = tapCandidate.current;
+            if (candidate && candidate.id === e.pointerId) {
+                tapCandidate.current = null;
+                if (!cancelled && !candidate.moved && !wasMultiTouch.current && !mosaicTool && Date.now() - candidate.startTime < 300) {
+                    const prevTap = lastTapRef.current;
+                    if (
+                        prevTap &&
+                        Date.now() - prevTap.time < 320 &&
+                        Math.hypot(e.clientX - prevTap.x, e.clientY - prevTap.y) < 32
+                    ) {
+                        lastTapRef.current = null;
+                        if (transformRef.current.zoom > 1.05) {
+                            resetZoom();
+                        } else {
+                            const anchor = viewportAnchorForEl(e.clientX, e.clientY, candidate.anchorEl);
+                            setTransform(prev => zoomStageTo(prev, DOUBLE_TAP_ZOOM, boundsRef.current, anchor));
+                        }
+                    } else {
+                        lastTapRef.current = { time: Date.now(), x: e.clientX, y: e.clientY };
+                    }
+                }
+            }
+
+            if (touchPointers.current.size < 2) {
+                pinchState.current = null;
+                pinchAnchorEl.current = null;
+            }
+
+            if (touchPointers.current.size === 1 && !mosaicTool && transformRef.current.zoom > 1) {
+                const [remaining] = Array.from(touchPointers.current.values());
+                panning.current = true;
+                setIsPanning(true);
+                panOrigin.current = {
+                    clientX: remaining.x,
+                    clientY: remaining.y,
+                    panX: transformRef.current.pan.x,
+                    panY: transformRef.current.pan.y,
+                };
+            } else if (touchPointers.current.size === 0) {
+                wasMultiTouch.current = false;
+                panning.current = false;
+                setIsPanning(false);
+                setCursorPos(null);
+            }
+        } else if (panning.current) {
+            panning.current = false;
+            setIsPanning(false);
+        }
+
+        if (painting.current) {
+            finishStroke();
+        }
+        dragging.current = false;
+        releaseViewportPointer(e.pointerId);
+    }
+
+    function handleDoubleClick() {
+        if (Date.now() - lastTouchEndTime.current < 450) return;
+        if (!mosaicTool && zoom > 1) resetZoom();
+    }
+
+    const stageStyle = {
+        width: previewWidth,
+        height: stageHeight,
+        transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+    };
+
+    const mosaicOverlayNodes = (
+        <>
+            <canvas
+                ref={overlay}
+                width={Math.max(1, Math.round(layout.photoWidth))}
+                height={Math.max(1, Math.round(layout.photoHeight))}
+                className="mosaic-overlay-canvas"
+                style={{
+                    left: `${left}%`,
+                    top: `${top}%`,
+                    width: `${(layout.photoWidth / layout.width) * 100}%`,
+                    height: `${(layout.photoHeight / layout.height) * 100}%`,
+                }}
+            />
+            {mosaicTool && cursorPos && (
+                <div
+                    className={`mosaic-brush-cursor${mosaicTool === 'erase' ? ' is-erase' : ''}`}
+                    style={{
+                        left: cursorPos.x,
+                        top: cursorPos.y,
+                        width: cssBrushRadius * 2,
+                        height: cssBrushRadius * 2,
+                    }}
+                    aria-hidden="true"
+                />
+            )}
+        </>
+    );
 
     return (
         <div className="stage-outer">
             <div className="work-heading">
                 {heading}
-                <div className="stage-toolbar-group">
-                    <div className="stage-zoom-controls" role="group" aria-label="Zoom">
-                        <button
-                            type="button"
-                            aria-label={t.zoomOutAria}
-                            disabled={zoom <= MIN_STAGE_ZOOM}
-                            onClick={() => applyZoom(zoom - 0.35)}
-                        >
-                            −
-                        </button>
-                        <button
-                            type="button"
-                            className="stage-zoom-readout"
-                            aria-label={t.zoomResetAria}
-                            onClick={resetZoom}
-                            title={t.zoomResetAria}
-                        >
-                            {Math.round(zoom * 100) <= 100 ? t.zoomFitLabel : `${Math.round(zoom * 100)}%`}
-                        </button>
-                        <button
-                            type="button"
-                            aria-label={t.zoomInAria}
-                            disabled={zoom >= MAX_STAGE_ZOOM}
-                            onClick={() => applyZoom(zoom + 0.35)}
-                        >
-                            +
-                        </button>
-                    </div>
-                    <div className="stage-view-controls" role="group" aria-label={t.previewModeGroupAria}>
-                        {([
-                            ['effect', t.viewEffect],
-                            ['compare', t.viewCompare],
-                            ['original', t.viewOriginal],
-                        ] as const).map(([mode, label]) => (
-                            <button
-                                key={mode}
-                                aria-pressed={view === mode}
-                                onClick={() => {
-                                    setView(mode);
-                                    if (mode === 'compare') setSplit(0.5);
+                <div className="stage-zoom-controls" role="group" aria-label={t.zoomControlsAria}>
+                    <button
+                        type="button"
+                        aria-label={t.zoomOutAria}
+                        disabled={zoom <= MIN_STAGE_ZOOM}
+                        onClick={() => applyZoom(zoom - 0.35)}
+                    >
+                        −
+                    </button>
+                    <button
+                        type="button"
+                        className="stage-zoom-readout"
+                        aria-label={t.zoomResetAria}
+                        onClick={resetZoom}
+                        title={t.zoomResetAria}
+                    >
+                        {Math.round(zoom * 100) <= 100 ? t.zoomFitLabel : `${Math.round(zoom * 100)}%`}
+                    </button>
+                    <button
+                        type="button"
+                        aria-label={t.zoomInAria}
+                        disabled={zoom >= MAX_STAGE_ZOOM}
+                        onClick={() => applyZoom(zoom + 0.35)}
+                    >
+                        +
+                    </button>
+                </div>
+            </div>
+            <div
+                className="stage-viewport"
+                ref={viewport}
+                onPointerDown={handleViewportPointerDown}
+                onPointerMove={handleViewportPointerMove}
+                onPointerUp={e => handleViewportPointerEnd(e, false)}
+                onPointerCancel={e => handleViewportPointerEnd(e, true)}
+            >
+                {sideBySide ? (
+                    <div className="stage-compare-pair" style={{ gap: COMPARE_GAP }}>
+                        <div className="stage-compare-pane" style={{ width: previewWidth, height: stageHeight }}>
+                            <div
+                                className={`stage-inner${zoom > 1 ? ' can-pan' : ''}${isPanning ? ' is-panning' : ''}`}
+                                style={stageStyle}
+                                onDoubleClick={handleDoubleClick}
+                            >
+                                <canvas ref={before} className="stage-canvas" aria-label={t.originalCanvasAria} />
+                            </div>
+                            <span className="stage-corner left">{t.cornerOriginal}</span>
+                        </div>
+                        <div className="stage-compare-pane" style={{ width: previewWidth, height: stageHeight }}>
+                            <div
+                                ref={mosaicSurfaceRef}
+                                className={`stage-inner${mosaicTool ? ' is-painting' : ''}${zoom > 1 && !mosaicTool ? ' can-pan' : ''}${isPanning ? ' is-panning' : ''}`}
+                                style={stageStyle}
+                                onDoubleClick={handleDoubleClick}
+                                onPointerLeave={() => {
+                                    if (!painting.current) setCursorPos(null);
                                 }}
                             >
-                                {label}
-                            </button>
-                        ))}
+                                <canvas ref={after} className="stage-canvas" aria-label={t.processedCanvasAria} />
+                                {mosaicOverlayNodes}
+                            </div>
+                            {processing && (
+                                <div className="stage-processing">
+                                    <span className="pulse-dot" /> {t.renderingPreview}
+                                </div>
+                            )}
+                            <span className="stage-corner right">{t.cornerProcessed}</span>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div className="stage-viewport" ref={viewport}>
-                <div
-                    className={`stage-inner${mosaicTool ? ' is-painting' : ''}${zoom > 1 && !mosaicTool ? ' can-pan' : ''}${isPanning ? ' is-panning' : ''}`}
-                    style={{
-                        width: previewWidth,
-                        height: stageHeight,
-                        transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-                    }}
-                    onDoubleClick={() => {
-                        if (!mosaicTool && zoom > 1) resetZoom();
-                    }}
-                    onPointerDown={handleStagePointerDown}
-                    onPointerMove={move}
-                    onPointerLeave={() => {
-                        if (!painting.current) setCursorPos(null);
-                    }}
-                    onPointerUp={e => {
-                        releaseTouchPointer(e);
-                        if (painting.current) {
-                            finishStroke();
-                        }
-                        if (panning.current) {
-                            panning.current = false;
-                            setIsPanning(false);
-                        }
-                        dragging.current = false;
-                        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-                            e.currentTarget.releasePointerCapture(e.pointerId);
-                        }
-                    }}
-                    onPointerCancel={e => {
-                        releaseTouchPointer(e);
-                        finishStroke();
-                        panning.current = false;
-                        setIsPanning(false);
-                        dragging.current = false;
-                    }}
-                >
-                    <canvas ref={after} className="stage-canvas" aria-label={t.processedCanvasAria} />
-                    <canvas
-                        ref={overlay}
-                        width={Math.max(1, Math.round(layout.photoWidth))}
-                        height={Math.max(1, Math.round(layout.photoHeight))}
-                        className="mosaic-overlay-canvas"
-                        style={{
-                            left: `${left}%`,
-                            top: `${top}%`,
-                            width: `${(layout.photoWidth / layout.width) * 100}%`,
-                            height: `${(layout.photoHeight / layout.height) * 100}%`,
+                ) : (
+                    <div
+                        ref={mosaicSurfaceRef}
+                        className={`stage-inner${mosaicTool ? ' is-painting' : ''}${zoom > 1 && !mosaicTool ? ' can-pan' : ''}${isPanning ? ' is-panning' : ''}`}
+                        style={stageStyle}
+                        onDoubleClick={handleDoubleClick}
+                        onPointerLeave={() => {
+                            if (!painting.current) setCursorPos(null);
                         }}
-                    />
-                    {mosaicTool && cursorPos && (
-                        <div
-                            className={`mosaic-brush-cursor${mosaicTool === 'erase' ? ' is-erase' : ''}`}
+                    >
+                        <canvas ref={after} className="stage-canvas" aria-label={t.processedCanvasAria} />
+                        {mosaicOverlayNodes}
+                        <canvas
+                            ref={before}
+                            className="stage-canvas"
                             style={{
-                                left: cursorPos.x,
-                                top: cursorPos.y,
-                                width: cssBrushRadius * 2,
-                                height: cssBrushRadius * 2,
+                                display: originalVisible || comparing ? 'block' : 'none',
+                                clipPath: originalVisible
+                                    ? `inset(${top}% ${100 - ((layout.x + layout.photoWidth) / layout.width) * 100}% ${bottom}% ${left}%)`
+                                    : `inset(${top}% ${right}% ${bottom}% ${left}%)`,
                             }}
-                            aria-hidden="true"
+                            aria-label={t.originalCanvasAria}
                         />
-                    )}
-                    <canvas
-                        ref={before}
-                        className="stage-canvas"
-                        style={{
-                            display: originalVisible || comparing ? 'block' : 'none',
-                            clipPath: originalVisible
-                                ? `inset(${top}% ${100 - ((layout.x + layout.photoWidth) / layout.width) * 100}% ${bottom}% ${left}%)`
-                                : `inset(${top}% ${right}% ${bottom}% ${left}%)`,
-                        }}
-                        aria-label={t.originalCanvasAria}
-                    />
-                    {comparing && (
-                        <div
-                            className="compare-line"
-                            style={{
-                                left: `${((layout.x + layout.photoWidth * split) / layout.width) * 100}%`,
-                                top: `${top}%`,
-                                bottom: `${bottom}%`,
-                            }}
-                            onPointerDown={e => {
-                                e.stopPropagation();
-                                dragging.current = true;
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                    parent.setPointerCapture(e.pointerId);
-                                    const rect = parent.getBoundingClientRect();
-                                    const x = ((e.clientX - rect.left) * layout.width) / rect.width;
-                                    setSplit(Math.max(0, Math.min(1, (x - layout.x) / layout.photoWidth)));
-                                }
-                            }}
-                            role="slider"
-                            aria-label={t.compareSliderAria}
-                            aria-valuenow={Math.round(split * 100)}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            tabIndex={0}
-                            onKeyDown={e => {
-                                if (e.key === 'ArrowLeft') setSplit(Math.max(0, split - 0.05));
-                                if (e.key === 'ArrowRight') setSplit(Math.min(1, split + 0.05));
-                            }}
-                        >
-                            <span className="compare-handle">‹ ›</span>
-                        </div>
-                    )}
-                    {processing && (
-                        <div className="stage-processing">
-                            <span className="pulse-dot" /> {t.renderingPreview}
-                        </div>
-                    )}
-                    {(originalVisible || comparing) && <span className="stage-corner left">{t.cornerOriginal}</span>}
-                </div>
+                        {comparing && (
+                            <div
+                                className="compare-line"
+                                style={{
+                                    left: `${((layout.x + layout.photoWidth * split) / layout.width) * 100}%`,
+                                    top: `${top}%`,
+                                    bottom: `${bottom}%`,
+                                }}
+                                role="slider"
+                                aria-label={t.compareSliderAria}
+                                aria-valuenow={Math.round(split * 100)}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                tabIndex={0}
+                                onKeyDown={e => {
+                                    if (e.key === 'ArrowLeft') setSplit(Math.max(0, split - 0.05));
+                                    if (e.key === 'ArrowRight') setSplit(Math.min(1, split + 0.05));
+                                }}
+                            >
+                                <span className="compare-handle">‹ ›</span>
+                            </div>
+                        )}
+                        {processing && (
+                            <div className="stage-processing">
+                                <span className="pulse-dot" /> {t.renderingPreview}
+                            </div>
+                        )}
+                        {(originalVisible || comparing) && <span className="stage-corner left">{t.cornerOriginal}</span>}
+                    </div>
+                )}
             </div>
-            <div className="stage-hint">{t.hintHoldSpace}</div>
+            <div className="stage-footer">
+                <div className="stage-view-actions" role="group" aria-label={t.previewModeGroupAria}>
+                    <button
+                        type="button"
+                        className="stage-view-btn"
+                        aria-pressed={view === 'split'}
+                        onClick={() => {
+                            setView(prev => (prev === 'split' ? 'effect' : 'split'));
+                            setSplit(0.5);
+                        }}
+                    >
+                        <StudioIcon name="split" size={14} />
+                        <span>{t.viewSplit}</span>
+                    </button>
+                    <button
+                        type="button"
+                        className="stage-view-btn"
+                        aria-pressed={view === 'sideBySide'}
+                        onClick={() => setView(prev => (prev === 'sideBySide' ? 'effect' : 'sideBySide'))}
+                    >
+                        <StudioIcon name="compare" size={14} />
+                        <span>{t.viewSideBySide}</span>
+                    </button>
+                </div>
+                <div className="stage-hint">{touchInputDetected ? t.hintTouchGestures : t.hintHoldSpace}</div>
+            </div>
         </div>
     );
 }

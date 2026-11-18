@@ -12,7 +12,7 @@ import {
 import { cleanResults, getResult } from '../storage/enhancementStore';
 import type { EnhancementRequest } from '../enhancement/orchestrator';
 import { ParameterSlider } from './ParameterSlider';
-import { prepareSingleSaveTarget } from '../imaging/export';
+import { isMobileBrowser, prepareSingleSaveTarget } from '../imaging/export';
 import { clearLocalModelCache, isLocalModelCached } from '../enhancement/local/LocalEnhancerClient';
 import { isLocalProfile, localModels, localModel, type LocalProfile } from '../enhancement/local/modelManifest';
 import { usePreferences } from '../config/preferences';
@@ -33,6 +33,7 @@ interface Props {
     onDenoise: (value: number) => void;
     onPreset: (preset: { strength: number; sharpen: number; clarity: number; denoise: number }) => void;
     onCommit: () => void;
+    onMobileSave?: (blob: Blob, filename: string) => Promise<void>;
 }
 
 const profileLabels: Record<LocalProfile, string> = {
@@ -213,6 +214,16 @@ export function EnhancementPanel(props: Props) {
                                 className="enhance-download"
                                 onClick={() => {
                                     const filename = `${props.tab.name.replace(/\.[^.]+$/, '')}-enhanced.png`;
+                                    if (isMobileBrowser() && props.onMobileSave) {
+                                        void props.onMobileSave(result.blob, filename).catch(error =>
+                                            setMessage(
+                                                t.saveFailedShort(
+                                                    error instanceof Error ? error.message : t.unknownError,
+                                                ),
+                                            ),
+                                        );
+                                        return;
+                                    }
                                     void prepareSingleSaveTarget(filename, 'png')
                                         .then(target => (target.cancelled ? 'cancelled' : target.save(result.blob, filename)))
                                         .then(mode => {

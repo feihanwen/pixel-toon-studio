@@ -14,6 +14,64 @@ import { autoColorPlan, exportBase } from '../enhancement/images';
 
 export type ExportFormat = 'png' | 'jpeg';
 export type SaveMode = 'desktop' | 'picker' | 'download' | 'cancelled';
+export type MobileShareOutcome = 'shared' | 'cancelled' | 'fallback';
+
+export function isMobileBrowser(
+    win: Window | undefined = typeof window !== 'undefined' ? window : undefined,
+    nav: Navigator | undefined = typeof navigator !== 'undefined' ? navigator : undefined,
+): boolean {
+    if (!win || !nav) return false;
+    if ((win as Window & { pixelToonDesktop?: unknown }).pixelToonDesktop) return false;
+    if (nav.webdriver) return false;
+    const ua = nav.userAgent || '';
+    const mobileUa = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(ua);
+    const iPadDesktopUa = nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1;
+    const coarse = typeof win.matchMedia === 'function' && win.matchMedia('(pointer: coarse)').matches;
+    return mobileUa || iPadDesktopUa || (coarse && (nav.maxTouchPoints ?? 0) > 0);
+}
+
+export function blobToShareFile(blob: Blob, filename: string, format: ExportFormat = 'png'): File {
+    const mime = blob.type || (format === 'jpeg' ? 'image/jpeg' : 'image/png');
+    return new File([blob], filename, { type: mime });
+}
+
+export function canNativeShareFiles(
+    files: File[],
+    nav: Navigator | undefined = typeof navigator !== 'undefined' ? navigator : undefined,
+): boolean {
+    if (!nav || files.length === 0) return false;
+    if (typeof nav.share !== 'function' || typeof nav.canShare !== 'function') return false;
+    try {
+        return nav.canShare({ files });
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Try opening the OS share sheet with image files so mobile users can tap
+ * "Save Image" straight into their Photos/Gallery app. Falls back cleanly when
+ * Web Share is unavailable (e.g. non-HTTPS LAN) or user activation expired.
+ */
+export async function tryShareFilesToPhotos(
+    files: File[],
+    title?: string,
+    nav: Navigator | undefined = typeof navigator !== 'undefined' ? navigator : undefined,
+): Promise<MobileShareOutcome> {
+    if (!canNativeShareFiles(files, nav) || !nav) return 'fallback';
+    try {
+        await nav.share({ files, title });
+        return 'shared';
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            return 'cancelled';
+        }
+        if (error instanceof Error && error.name === 'AbortError') {
+            return 'cancelled';
+        }
+        return 'fallback';
+    }
+}
 
 interface WritableStreamLike {
     write(data: Blob): Promise<void>;
@@ -323,7 +381,7 @@ export function exportFilename(
     return `${base}${enhanced ? '-enhanced' : ''}-pixel-toon-${STYLES[styleId].short}.${ext}`;
 }
 
-function triggerBrowserDownload(blob: Blob, name: string) {
+export function triggerBrowserDownload(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -355,7 +413,7 @@ export async function prepareSingleSaveTarget(
     }
 
     const pickerWin = window as SavePickerWindow;
-    if (!navigator.webdriver && typeof pickerWin.showSaveFilePicker === 'function') {
+    if (!isMobileBrowser() && !navigator.webdriver && typeof pickerWin.showSaveFilePicker === 'function') {
         try {
             const handle = await pickerWin.showSaveFilePicker({
                 suggestedName,
@@ -428,7 +486,7 @@ export async function prepareBatchSaveTarget(): Promise<{
     }
 
     const pickerWin = window as SavePickerWindow;
-    if (!navigator.webdriver && typeof pickerWin.showDirectoryPicker === 'function') {
+    if (!isMobileBrowser() && !navigator.webdriver && typeof pickerWin.showDirectoryPicker === 'function') {
         try {
             const dir = await pickerWin.showDirectoryPicker({ mode: 'readwrite' });
             return {

@@ -45,7 +45,8 @@ try {
     assert.equal(await sections.first().evaluate(element => element.tagName), 'SECTION');
     assert.equal(await page.locator('.controls > details.control-section').count(), 5);
     assert.equal(await page.locator('.controls > details.control-section[open]').count(), 0);
-    assert.equal(await page.locator('.stage-view-controls button').count(), 3);
+    assert.equal(await page.locator('.stage-view-controls').count(), 0);
+    assert.equal(await page.locator('.stage-view-actions button').count(), 2);
     assert.equal(await page.getByRole('button', { name: '优化后底图', exact: true }).count(), 0);
     for (const summary of await page.locator('.controls > details.control-section > summary').all()) {
         await summary.focus(); await summary.press('Space');
@@ -53,7 +54,7 @@ try {
         await summary.press('Space');
         assert.equal(await summary.evaluate(element => element.parentElement.open), false);
     }
-    record('visual style stays first and expanded; all five adjustment panels collapse with keyboard; only three preview modes remain');
+    record('visual style stays first and expanded; all five adjustment panels collapse with keyboard; two bottom-left view buttons replace old switcher');
     await page.locator('.global-adjustments > summary').click();
     const brightness = page.getByRole('slider', { name: '亮度', exact: true });
     await brightness.focus(); await brightness.press('ArrowRight'); await brightness.press('Tab');
@@ -64,7 +65,7 @@ try {
     await page.locator('.global-adjustments > summary').click();
     await page.locator('.auto-color-panel > summary').click();
     await page.getByRole('checkbox', { name: '优化底图光色', exact: true }).check(); await idle();
-    assert.equal(await page.locator('.stage-view-controls button').count(), 3);
+    assert.equal(await page.locator('.stage-view-actions button').count(), 2);
     await page.locator('.auto-color-panel > summary').click();
     record('collapsed settings preserve values, undo/redo works, smart color does not restore the deleted preview');
     await page.locator('.frame-panel > summary').click();

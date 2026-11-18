@@ -92,9 +92,9 @@ try {
     await colorPanel.locator('summary').click();
     assert.equal(await colorToggle.isVisible(), false);
     await colorPanel.locator('summary').click(); await colorToggle.uncheck(); await colorPanel.locator('summary').click();
-    const controls = await page.locator('.stage-view-controls').boundingBox();
+    const controls = await page.locator('.stage-zoom-controls').boundingBox();
     const workArea = await page.locator('.work-area').boundingBox();
-    assert.ok(Math.abs(controls.y - workArea.y) < 2, 'preview controls stay at the top');
+    assert.ok(Math.abs(controls.y - workArea.y) < 2, 'zoom controls stay at the top');
     record('packaged editor shares the compact glass toolbar and collapsible smart color panel');
 
     await page.locator('.style-card').nth(3).click();

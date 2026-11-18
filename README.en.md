@@ -41,7 +41,7 @@ All image decoding, canvas shader pipelines, and 6 bundled ONNX neural networks 
 - 🖼 **27 Themed Instant Polaroid Frames**: Spanning 6 curated categories (Solid Classic, Dreamy Gradient, Retro Pattern, Anime & Pop, Paper & Texture, Collage & DIY), dynamically rendered on Canvas to fit your photo's native aspect ratio with one-click shuffle.
 - ✍️ **48 Bilingual Captions, Custom Text & Camera EXIF**: Filterable by language and 8 themes, plus custom text notes (up to 48 characters) and privacy-consented camera EXIF readout (model, shutter speed, aperture, ISO, and capture date).
 - 📑 **Multi-Tab Workspace & Selective Batch Export**: Edit multiple photos in parallel tabs with independent undo/redo history; open *Select & Export* in the sidebar to check photos (with Select All, clicking any photo switches the left canvas preview) and export as **PNG (Lossless)** or **JPEG (Compact)**.
-- ⚡ **Multi-Threaded Tiled HD Export & Custom Save Location**: Web Worker 768 px tiled rendering with dynamic style/mosaic halo padding exports up to **24 MP / 12,000 px** seamless PNG or JPEG files while stripping sensitive GPS & EXIF metadata; supports picking save files/folders directly on Desktop and Chromium browsers.
+- ⚡ **Multi-Threaded Tiled HD Export & Cross-Device Saving**: Web Worker 768 px tiled rendering with dynamic style/mosaic halo padding exports up to **24 MP / 12,000 px** seamless PNG or JPEG files while stripping sensitive GPS & EXIF metadata; supports picking save files/folders directly on Desktop and Chromium browsers, and saving straight to Phone Photos via native OS share sheet or long-press preview modal on mobile browsers.
 - 🌐 **Full Bilingual UI & 6 Glassmorphic Theme Palettes**: First-launch language onboarding and Preferences popover for instant live switching between **English / 简体中文** (across all styles, sliders, frames, captions, and native desktop menus), **System / Light / Dark** appearance, and 6 theme colors (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
 - 💻 **macOS & Windows Offline Desktop App & PWA**: Native builds for **macOS** (`.dmg`) and **Windows** (NSIS installer & standalone Portable `.exe`) with HEIC/HEIF decoding, OS file associations, drag-and-drop, Dock drop, platform shortcuts, and offline PWA support.
 
@@ -59,7 +59,7 @@ flowchart TB
     end
 
     subgraph UI["React Editor Main Thread (ErrorBoundary Protected)"]
-        Stage["CanvasStage Preview\n(Effect / Split Compare / Zoom & Pan / Mosaic Brush)"]
+        Stage["CanvasStage Preview\n(Split View / Compare View / Pinch Zoom & Pan / Mosaic Brush)"]
         Sidebar["Non-Blocking Right Sidebar\nPresets · Core & Advanced Sliders · Frames · Batch Export"]
         DB["Local Storage\nIndexedDB (Workspace/Results) + Cache Storage (Model Weights)"]
     end
@@ -212,8 +212,8 @@ Organized into 6 categories with a visual picker, category filter, and random sh
 - 🎨 **Adaptive Themes & 6 Color Palettes**: System, Light, and Dark modes paired with 6 curated palettes (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
 - 🖥️ **Desktop & Web Integrations**: macOS frosted draggable title bar, Dock drop, and `Cmd` shortcuts; Windows native title bar, NSIS installer, standalone Portable `.exe`, multi-resolution `.ico`, Explorer "Open With", and `Ctrl` shortcuts.
 - 📱 **Wide Format Support**: Native **HEIC / HEIF** (iPhone/iPad), PNG, JPEG, and WebP up to 24 MP / 12,000 px via file picker, drag-and-drop, or clipboard paste (`Cmd/Ctrl + V`).
-- 📑 **Multi-Tab Workspace, Dual Format & Batch Export**: Independent per-tab state and history; open *Select & Export* in the sidebar for Select All/Deselect All, click-to-preview, and batch export in **PNG (Lossless)** or **JPEG (Compact, 92% quality)**, with direct file/folder picking on Desktop and Chromium browsers.
-- 👁 **Instant Comparison, Cursor Zoom & Pan**: Switch between *Full Effect*, *Split Compare*, and *Original*; zoom (`100%–500%`) via toolbar buttons (`−` / `Fit` / `+`), cursor-anchored wheel, trackpad pinch, or two-finger touch pinch; drag to pan (or `Alt`+drag / middle-click while Mosaic Brush is active), double-click to reset, or hold **Spacebar** anywhere to peek at the original photo.
+- 📑 **Multi-Tab Workspace, Dual Format & Cross-Device Batch Export**: Independent per-tab state and history; open *Select & Export* in the sidebar for Select All/Deselect All, click-to-preview, and batch export in **PNG (Lossless)** or **JPEG (Compact, 92% quality)**, with direct file/folder picking on Desktop and Chromium browsers, and native OS share-to-Photos or a long-press preview sheet with download fallback on mobile browsers (for single, batch, and enhanced base exports).
+- 👁 **Dual Comparison Modes & Touch/Desktop Zoom & Pan**: Bottom-left view buttons toggle *Split View* (draggable divider) and *Compare View* (synchronized side-by-side Original vs. Styled panes), while holding **Spacebar** anywhere peeks at the original photo; zoom (`100%–500%`) via toolbar buttons (`−` / `Fit` / `+`), cursor-anchored wheel or trackpad pinch, **two-finger pinch-to-zoom with simultaneous midpoint pan**, single-finger drag pan (or `Alt`+drag / middle-click on desktop while Mosaic Brush is active), and **double-click / double-tap** to zoom or reset, with adaptive touch gesture hints.
 - ↶ **Undo/Redo, Persistence & Recovery**: Full `Cmd/Ctrl + Z` / `Cmd/Ctrl + Shift + Z` history, automatic IndexedDB persistence, and a top-level React `ErrorBoundary` offering one-click recovery or reload without losing local photos.
 - 🛡 **Zero-Leak Privacy**: All computation stays on your CPU/GPU; exported PNGs and JPEGs automatically strip GPS and EXIF metadata.
 
@@ -234,7 +234,7 @@ npm install
 # 3. Launch local development server
 npm run dev
 
-# 4. Run typecheck, model integrity verification, and full unit test suite (25 suites, 166 tests)
+# 4. Run typecheck, model integrity verification, and full unit test suite (26 suites, 172 tests)
 npm run typecheck
 npm run verify:model
 npm run test:run -- --maxWorkers=1

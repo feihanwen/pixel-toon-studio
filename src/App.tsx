@@ -23,12 +23,18 @@ import { decode, toImageData, imageDataCanvas, FILE_ACCEPT, prepareImageImport }
 import { detectExif, parseExif } from './imaging/exif';
 import { WorkerClient } from './imaging/workerClient';
 import {
+    blobToShareFile,
+    canNativeShareFiles,
     exportImage,
     exportFilename,
+    isMobileBrowser,
     prepareBatchSaveTarget,
     prepareSingleSaveTarget,
+    triggerBrowserDownload,
+    tryShareFilesToPhotos,
     type ExportFormat,
 } from './imaging/export';
+import { MobileSaveModal, type MobileSaveItem } from './components/MobileSaveModal';
 import { CanvasStage } from './components/CanvasStage';
 import { ControlsPanel } from './components/ControlsPanel';
 import { CaptionPickerDialog } from './components/CaptionPickerDialog';
@@ -119,6 +125,8 @@ function AppContent() {
     const [pencilSketch, setPencilSketch] = useState<CachedPencilSketch | null>(null);
     const [pencilSketchLoading, setPencilSketchLoading] = useState(false);
     const [pencilSketchFailedKey, setPencilSketchFailedKey] = useState('');
+    const [mobileSaveItems, setMobileSaveItems] = useState<MobileSaveItem[] | null>(null);
+    const mobileSaveUrlsRef = useRef<string[]>([]);
 
     const fileInput = useRef<HTMLInputElement>(null);
     const worker = useRef<WorkerClient | null>(null);
@@ -153,6 +161,10 @@ function AppContent() {
             pencilSketchClient.current?.dispose();
             pencilSketchCache.current.clear();
             cancelAllEnhancements();
+            for (const url of mobileSaveUrlsRef.current) {
+                URL.revokeObjectURL(url);
+            }
+            mobileSaveUrlsRef.current = [];
         };
     }, []);
 
@@ -767,6 +779,39 @@ function AppContent() {
         }
     }
 
+    function closeMobileSaveModal() {
+        for (const url of mobileSaveUrlsRef.current) {
+            URL.revokeObjectURL(url);
+        }
+        mobileSaveUrlsRef.current = [];
+        setMobileSaveItems(null);
+    }
+
+    async function deliverMobileExport(
+        entries: Array<{ blob: Blob; filename: string; format: ExportFormat }>,
+    ) {
+        if (!entries.length) return;
+        const files = entries.map(entry => blobToShareFile(entry.blob, entry.filename, entry.format));
+        const outcome = await tryShareFilesToPhotos(files, files[0]?.name);
+        if (outcome === 'shared') {
+            setNotice(t.mobileShareOpened(entries.length));
+            return;
+        }
+        if (outcome === 'cancelled') {
+            setNotice(t.exportCancelled);
+            return;
+        }
+        for (const url of mobileSaveUrlsRef.current) {
+            URL.revokeObjectURL(url);
+        }
+        const items: MobileSaveItem[] = entries.map(entry => ({
+            ...entry,
+            url: URL.createObjectURL(entry.blob),
+        }));
+        mobileSaveUrlsRef.current = items.map(item => item.url);
+        setMobileSaveItems(items);
+    }
+
     async function doExport() {
         if (!active || !current || exporting) return;
         const filename = exportFilename(
@@ -776,8 +821,9 @@ function AppContent() {
             exportFormat,
         );
         const fmtLabel = exportFormat === 'jpeg' ? 'JPEG' : 'PNG';
-        const saveTarget = await prepareSingleSaveTarget(filename, exportFormat);
-        if (saveTarget.cancelled) {
+        const mobileMode = isMobileBrowser();
+        const saveTarget = mobileMode ? null : await prepareSingleSaveTarget(filename, exportFormat);
+        if (saveTarget?.cancelled) {
             setNotice(t.exportCancelled);
             return;
         }
@@ -810,10 +856,14 @@ function AppContent() {
                 readyExportPencilSketch,
                 exportFormat,
             );
-            const mode = await saveTarget.save(blob, filename);
-            if (mode === 'desktop') setNotice(t.imageSavedDesktop(fmtLabel));
-            else if (mode === 'picker') setNotice(t.imageSavedPicker(fmtLabel));
-            else if (mode === 'download') setNotice(t.imageSavedBrowser(fmtLabel));
+            if (mobileMode) {
+                await deliverMobileExport([{ blob, filename, format: exportFormat }]);
+            } else if (saveTarget) {
+                const mode = await saveTarget.save(blob, filename);
+                if (mode === 'desktop') setNotice(t.imageSavedDesktop(fmtLabel));
+                else if (mode === 'picker') setNotice(t.imageSavedPicker(fmtLabel));
+                else if (mode === 'download') setNotice(t.imageSavedBrowser(fmtLabel));
+            }
         } catch (e) {
             setNotice(t.exportFailed(e instanceof Error ? e.message : t.unknownError));
         } finally {
@@ -825,8 +875,9 @@ function AppContent() {
         if (exporting || batchSelectedIds.length === 0) return;
         const selectedTabs = tabs.filter(tab => batchSelectedIds.includes(tab.id));
         if (!selectedTabs.length) return;
-        const target = await prepareBatchSaveTarget();
-        if (!target) {
+        const mobileMode = isMobileBrowser();
+        const target = mobileMode ? null : await prepareBatchSaveTarget();
+        if (!mobileMode && !target) {
             setNotice(t.exportCancelled);
             return;
         }
@@ -836,6 +887,23 @@ function AppContent() {
         const fmtLabel = exportFormat === 'jpeg' ? 'JPEG' : 'PNG';
         try {
             let exportedCount = 0;
+            const mobileEntries: Array<{ blob: Blob; filename: string; format: ExportFormat }> = [];
+            const usedMobileNames = new Set<string>();
+            const uniqueMobileName = (name: string) => {
+                if (!usedMobileNames.has(name)) {
+                    usedMobileNames.add(name);
+                    return name;
+                }
+                const dot = name.lastIndexOf('.');
+                const stem = dot > 0 ? name.slice(0, dot) : name;
+                const ext = dot > 0 ? name.slice(dot) : '';
+                let n = 2;
+                while (usedMobileNames.has(`${stem}-${n}${ext}`)) n++;
+                const candidate = `${stem}-${n}${ext}`;
+                usedMobileNames.add(candidate);
+                return candidate;
+            };
+
             for (const tab of selectedTabs) {
                 const s = snapshot(tab);
                 const tabExif =
@@ -878,20 +946,28 @@ function AppContent() {
                     s.enhancement.enabled && s.enhancement.strength > 0,
                     exportFormat,
                 );
-                await target.save(blob, filename, exportFormat);
+                if (mobileMode) {
+                    mobileEntries.push({ blob, filename: uniqueMobileName(filename), format: exportFormat });
+                } else if (target) {
+                    await target.save(blob, filename, exportFormat);
+                }
                 exportedCount++;
                 setBatchProgress({ done: exportedCount, total: selectedTabs.length });
             }
             setBatchExportOpen(false);
-            setNotice(
-                target.mode === 'download'
-                    ? t.batchSavedBrowser(exportedCount, fmtLabel)
-                    : t.batchSavedFolder(exportedCount, fmtLabel),
-            );
+            if (mobileMode) {
+                await deliverMobileExport(mobileEntries);
+            } else if (target) {
+                setNotice(
+                    target.mode === 'download'
+                        ? t.batchSavedBrowser(exportedCount, fmtLabel)
+                        : t.batchSavedFolder(exportedCount, fmtLabel),
+                );
+            }
         } catch (e) {
             setNotice(t.exportFailed(e instanceof Error ? e.message : t.unknownError));
         } finally {
-            await target.finish().catch(() => {});
+            await target?.finish().catch(() => {});
             setExporting(false);
             setBatchProgress(null);
         }
@@ -1250,6 +1326,9 @@ function AppContent() {
                                         })
                                     }
                                     onCommit={finishDraft}
+                                    onMobileSave={async (blob, filename) => {
+                                        await deliverMobileExport([{ blob, filename, format: 'png' }]);
+                                    }}
                                 />
                             </>
                         ) : null
@@ -1379,6 +1458,39 @@ function AppContent() {
                         ×
                     </button>
                 </div>
+            )}
+            {mobileSaveItems && (
+                <MobileSaveModal
+                    items={mobileSaveItems}
+                    canShare={canNativeShareFiles(
+                        mobileSaveItems.map(item => blobToShareFile(item.blob, item.filename, item.format)),
+                    )}
+                    onShareToPhotos={async () => {
+                        const files = mobileSaveItems.map(item =>
+                            blobToShareFile(item.blob, item.filename, item.format),
+                        );
+                        const outcome = await tryShareFilesToPhotos(files, files[0]?.name);
+                        if (outcome === 'shared') {
+                            const count = mobileSaveItems.length;
+                            closeMobileSaveModal();
+                            setNotice(t.mobileShareOpened(count));
+                        }
+                    }}
+                    onDownloadFiles={() => {
+                        const items = mobileSaveItems;
+                        items.forEach((item, idx) => {
+                            setTimeout(() => triggerBrowserDownload(item.blob, item.filename), idx * 220);
+                        });
+                        const fmtLabel = items[0]?.format === 'jpeg' ? 'JPEG' : 'PNG';
+                        closeMobileSaveModal();
+                        setNotice(
+                            items.length > 1
+                                ? t.batchSavedBrowser(items.length, fmtLabel)
+                                : t.imageSavedBrowser(fmtLabel),
+                        );
+                    }}
+                    onClose={closeMobileSaveModal}
+                />
             )}
             {dragging && (
                 <div className="drop-overlay">

@@ -6,7 +6,7 @@ export function StudioIcon({
     size = 20,
     style,
 }: {
-    name: 'photo' | 'plus' | 'sparkles' | 'lock' | 'sliders' | 'arrow' | 'settings';
+    name: 'photo' | 'plus' | 'sparkles' | 'lock' | 'sliders' | 'arrow' | 'settings' | 'split' | 'compare';
     size?: number;
     style?: CSSProperties;
 }) {
@@ -55,6 +55,18 @@ export function StudioIcon({
                 <>
                     <circle cx="12" cy="12" r="3.2" />
                     <path d="M12 3.5v2.2m0 12.6v2.2M3.5 12h2.2m12.6 0h2.2m-14.5-6 1.6 1.6m8.8 8.8 1.6 1.6m0-12-1.6 1.6m-8.8 8.8-1.6 1.6" />
+                </>
+            )}
+            {name === 'split' && (
+                <>
+                    <rect x="3" y="4.5" width="18" height="15" rx="3.5" />
+                    <path d="M12 2.5v19" />
+                </>
+            )}
+            {name === 'compare' && (
+                <>
+                    <rect x="2.5" y="5" width="8" height="14" rx="2.5" />
+                    <rect x="13.5" y="5" width="8" height="14" rx="2.5" />
                 </>
             )}
         </svg>

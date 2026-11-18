@@ -88,6 +88,19 @@ export const UI_STRINGS = {
         imageSavedDesktop: (fmt: string) => `${fmt} 已保存到所选位置`,
         imageSavedPicker: (fmt: string) => `${fmt} 已保存到所选文件夹`,
         imageSavedBrowser: (fmt: string) => `${fmt} 已导出到下载文件夹`,
+        mobileShareOpened: (count: number) =>
+            count > 1
+                ? `已打开系统分享，轻点「存储 ${count} 张图像」即可存入手机相册`
+                : '已打开系统分享，轻点「存储图像」即可存入手机相册',
+        mobileSaveModalTitle: '保存到手机相册',
+        mobileSaveModalShareHint: '轻点下方「保存到手机相册」，在系统面板中选择「存储图像」；也可长按上方图片直接存入相册。',
+        mobileSaveModalLongPressHint: '长按上方图片，选择「存储到“照片”」或「保存图片」即可直接存入手机相册（无需去文件里翻找）。',
+        mobileSaveModalBatchLongPressHint: '长按任意图片可单独存入相册；如支持系统分享，也可一次保存全部。',
+        mobileSaveToPhotosBtn: (count: number) =>
+            count > 1 ? `全部保存到手机相册（${count} 张）` : '保存到手机相册',
+        mobileDownloadFileBtn: '下载图片文件',
+        mobileSaveCloseBtn: '完成',
+        mobileSaveCloseAria: '关闭保存面板',
         exportCancelled: '已取消保存',
         exportFailed: (msg: string) => `导出失败：${msg}`,
         workspaceLoadFailed: '无法读取本地工作区，仍可继续导入图片',
@@ -96,10 +109,10 @@ export const UI_STRINGS = {
         desktopImportFailed: (msg: string) => `图片导入失败：${msg}`,
         desktopBusyBeforeClose: '图片正在读取、导入或导出，请稍后关闭。',
         // CanvasStage
-        previewModeGroupAria: '预览显示方式',
-        viewEffect: '完整效果',
-        viewCompare: '左右对比',
-        viewOriginal: '原图',
+        previewModeGroupAria: '视图切换',
+        viewSplit: '分离视图',
+        viewSideBySide: '对比视图',
+        zoomControlsAria: '画面缩放',
         livePreviewBadge: '实时预览',
         processedCanvasAria: '处理后的图片',
         originalCanvasAria: '原图比较区域',
@@ -108,6 +121,7 @@ export const UI_STRINGS = {
         cornerOriginal: '原图',
         cornerProcessed: '处理效果',
         hintHoldSpace: '按住空格查看原图',
+        hintTouchGestures: '双指捏合缩放 · 拖动移动 · 双击放大/还原',
         zoomOutAria: '缩小画面',
         zoomInAria: '放大画面',
         zoomResetAria: '重置缩放到适应窗口',
@@ -337,6 +351,22 @@ export const UI_STRINGS = {
         imageSavedDesktop: (fmt: string) => `${fmt} saved to selected location`,
         imageSavedPicker: (fmt: string) => `${fmt} saved to chosen folder`,
         imageSavedBrowser: (fmt: string) => `${fmt} exported to Downloads`,
+        mobileShareOpened: (count: number) =>
+            count > 1
+                ? `Share sheet opened — tap "Save ${count} Images" to add to Photos`
+                : 'Share sheet opened — tap "Save Image" to add to Photos',
+        mobileSaveModalTitle: 'Save to Phone Photos',
+        mobileSaveModalShareHint:
+            'Tap "Save to Photos" below and choose "Save Image", or long-press the image above to save directly to your album.',
+        mobileSaveModalLongPressHint:
+            'Long-press the image above and choose "Save to Photos" / "Save Image" to add it straight to your gallery.',
+        mobileSaveModalBatchLongPressHint:
+            'Long-press any image to save it to Photos, or use Save All if supported by your browser.',
+        mobileSaveToPhotosBtn: (count: number) =>
+            count > 1 ? `Save All to Photos (${count})` : 'Save to Photos',
+        mobileDownloadFileBtn: 'Download File',
+        mobileSaveCloseBtn: 'Done',
+        mobileSaveCloseAria: 'Close save dialog',
         exportCancelled: 'Save cancelled',
         exportFailed: (msg: string) => `Export failed: ${msg}`,
         workspaceLoadFailed: 'Could not load saved workspace; you can still import photos',
@@ -345,10 +375,10 @@ export const UI_STRINGS = {
         desktopImportFailed: (msg: string) => `Failed to import photo: ${msg}`,
         desktopBusyBeforeClose: 'A photo is currently loading, importing, or exporting. Please wait.',
         // CanvasStage
-        previewModeGroupAria: 'Preview display mode',
-        viewEffect: 'Full Effect',
-        viewCompare: 'Split Compare',
-        viewOriginal: 'Original',
+        previewModeGroupAria: 'View modes',
+        viewSplit: 'Split View',
+        viewSideBySide: 'Compare View',
+        zoomControlsAria: 'Zoom controls',
         livePreviewBadge: 'Live Preview',
         processedCanvasAria: 'Processed photo',
         originalCanvasAria: 'Original comparison area',
@@ -357,6 +387,7 @@ export const UI_STRINGS = {
         cornerOriginal: 'Original',
         cornerProcessed: 'Styled',
         hintHoldSpace: 'Hold Space for original',
+        hintTouchGestures: 'Pinch to zoom · Drag to pan · Double-tap',
         zoomOutAria: 'Zoom out',
         zoomInAria: 'Zoom in',
         zoomResetAria: 'Reset zoom to fit',

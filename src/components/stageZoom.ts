@@ -112,3 +112,36 @@ export function zoomStageTo(
     if (!Number.isFinite(targetZoom) || prev.zoom <= 0) return prev;
     return zoomStageByFactor(prev, targetZoom / prev.zoom, bounds, anchor);
 }
+
+/**
+ * Simultaneously pinch-zoom by `factor` and pan as the gesture midpoint moves
+ * from `prevAnchor` to `nextAnchor` (both relative to viewport/pane center).
+ */
+export function panAndZoomStage(
+    prev: StageTransform,
+    factor: number,
+    bounds: StageBounds,
+    prevAnchor: ZoomAnchor,
+    nextAnchor: ZoomAnchor,
+): StageTransform {
+    const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1;
+    const candidate = prev.zoom * safeFactor;
+    const nextZoom =
+        safeFactor < 1 && candidate <= 1.02
+            ? MIN_STAGE_ZOOM
+            : Math.max(MIN_STAGE_ZOOM, Math.min(MAX_STAGE_ZOOM, Number(candidate.toFixed(4))));
+
+    if (nextZoom === MIN_STAGE_ZOOM) {
+        return INITIAL_STAGE_TRANSFORM;
+    }
+
+    const nextPan = {
+        x: nextAnchor.cx - ((prevAnchor.cx - prev.pan.x) / prev.zoom) * nextZoom,
+        y: nextAnchor.cy - ((prevAnchor.cy - prev.pan.y) / prev.zoom) * nextZoom,
+    };
+
+    return {
+        zoom: nextZoom,
+        pan: clampStagePan(nextPan, nextZoom, bounds),
+    };
+}
