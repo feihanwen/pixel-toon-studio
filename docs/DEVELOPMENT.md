@@ -55,11 +55,15 @@ DESKTOP_EXECUTABLE="$PWD/release/mac-arm64/Pixel & Toon Studio.app/Contents/MacO
 
 ## 模型与处理限制
 
-- [LiveAction SPAN ×2](../public/models/liveaction-span-x2/README.md)：原生 ×2，Apache-2.0。
-- [FFDNet](../public/models/ffdnet-color/README.md)：固定 sigma=15/255，原尺寸去噪后双三次放大到 ×2，MIT 实现。
+- [LiveAction SPAN ×2](../public/models/liveaction-span-x2/README.md)：原生 ×2 超分，Apache-2.0。
+- [OmniSR ×2](../public/models/omnisr-x2/README.md)：全频域注意力 ×2 超分，Apache-2.0。
+- [RealESR-Anime ×2](../public/models/realesr-anime-x2/README.md)：二次元线条优化 ×2 超分，BSD-3-Clause。
+- [NAFNet Denoise](../public/models/nafnet-denoise/README.md)：1× 保边降噪后双三次放大至 ×2，MIT。
+- [Face Seg Multiclass](../public/models/face-seg-multiclass/README.md)：256×256 人脸多类别分割（用于智能马赛克面部贴合），Apache-2.0。
+- [Pencil Lineart](../public/models/pencil-lineart/README.md)：≤640 px 动态尺寸神经线稿提取，MIT。
 
 模型优先 WebGPU，失败后使用 WASM。增强输入上限 6 MP，输出上限 24 MP / 单边 12,000 px；普通图片导入上限 24 MP / 单边 12,000 px。智能调色属于本机光色算法，默认关闭。
 
 Mac 工作区位于 `~/Library/Application Support/Pixel & Toon Studio/`，与浏览器工作区独立。网页通过 Service Worker 缓存已取得的资源；首次运行仍需先取得网页、模型及运行时。
 
-[返回产品首页](../README.md)
+[返回产品首页 (English)](../README.md) · [简体中文首页](../README.zh-CN.md)

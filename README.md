@@ -1,74 +1,74 @@
 <div align="center">
-  <img src="desktop/assets/icon.png" width="108" alt="Pixel & Toon Studio 图标">
+  <img src="desktop/assets/icon.png" width="108" alt="Pixel & Toon Studio Icon">
   <h1>Pixel & Toon Studio</h1>
-  <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
-  <p><strong>让每一张日常照片，都变成动漫分镜、手绘艺术或怀旧明信片。</strong></p>
-  <p>纯本地端离线运行 · 零配置 · 零上传 · 保护隐私 · 无需 API Key</p>
+  <p><a href="README.zh-CN.md">简体中文</a> · <strong>English</strong></p>
+  <p><strong>Transform everyday photos into anime stills, painted artworks, or vintage postcards.</strong></p>
+  <p>100% on-device · Zero setup · Zero uploads · Privacy-first · No API keys required</p>
   <p>
-    <a href="https://pixelstudio-g.vercel.app/"><strong>🌐 在线体验 Web Demo (pixelstudio-y.vercel.app)</strong></a>
+    <a href="https://pixelstudio-g.vercel.app/"><strong>🌐 Try Live Web Demo (pixelstudio-g.vercel.app)</strong></a>
   </p>
   <p>
-    <a href="#核心功能一览">核心功能</a>
+    <a href="#feature-overview">Features</a>
     &nbsp; · &nbsp;
-    <a href="#系统架构设计">系统架构</a>
+    <a href="#system-architecture">Architecture</a>
     &nbsp; · &nbsp;
-    <a href="#实际效果案例">效果样例</a>
+    <a href="#real-world-examples">See Results</a>
     &nbsp; · &nbsp;
-    <a href="#风格画廊与参数系统">风格与参数</a>
+    <a href="#style-gallery--tuning-system">Styles & Tuning</a>
     &nbsp; · &nbsp;
-    <a href="#本机端-ai-引擎与模型矩阵">本机 AI 引擎</a>
+    <a href="#on-device-ai-engine--model-matrix">On-Device AI</a>
     &nbsp; · &nbsp;
-    <a href="docs/DEVELOPMENT.md">开发说明</a>
+    <a href="docs/DEVELOPMENT.md">Dev Guide</a>
   </p>
 </div>
 
 ---
 
-![Pixel & Toon Studio 编辑器界面：海滨小镇原图与水彩效果实时对比](docs/showcase/editor.jpg)
+![Pixel & Toon Studio editor interface: real-time split view comparison between coastal town original photo and watercolor effect](docs/showcase/editor.jpg)
 
-**Pixel & Toon Studio** 是一款专注让静态照片焕发艺术质感的本地图像创作工具。只需导入一张随拍，就能将其转换为赛璐璐二次元动漫、2D 线条像素、水彩油画、美漫波普、黑白日漫、AI 线稿彩铅手绘、双色海报或复古胶片风格；同时内置 **AI 面部贴合马赛克**、**智能调色 v2**、**4 款本机 AI 超分降噪模型**、**27 款拍立得相框**、**200 条中英文双语文案（中英各 100 条）**、自定义文字以及相机 EXIF 摄影参数，支持单张或勾选批量导出高清 **PNG / JPEG** 艺术卡片。
+**Pixel & Toon Studio** is a private, on-device creative photo studio for desktop and web. Turn everyday snapshots into Cel Shaded Anime, 2D Pixel Line Art, Watercolor & Impasto, Pop Art Halftone, Manga Screentone, AI-assisted Colored Pencil Sketch, Duotone Posters, or Vintage 35mm Film. Complete your creation with **Smart Mosaic Brush (AI Face Contour Fit)**, **Smart Color v2**, **4 on-device AI super-resolution & denoise models**, **27 themed Polaroid frames**, **200 bilingual captions (100 Chinese + 100 English)**, custom text, or camera EXIF specs — ready for single or selective batch export as high-resolution **PNG / JPEG** keepsake cards.
 
-所有图像解码、滤镜着色器渲染与 6 个内置 ONNX 神经网络模型推理都在你的本地设备上独立完成，**无需联网、不用注册账号、无需配置任何 API Key**，你的照片隐私 100% 留在自己手中。
-
----
-
-## 核心功能一览
-
-- 🎨 **8 大视觉艺术风格与一键预设**：涵盖赛璐璐动漫（Oklab 感知双边滤波）、2D 线条像素（形态学清理 + 4 方向 NMS 边缘）、水彩油画、美漫波普、黑白日漫、彩铅手绘（**内置 AI 神经网络线稿提取 + 轮廓排线**）、双色海报与复古胶片。每款风格提供 **3 组风格预设胶囊**、**3 项核心主滑块**与可折叠的**高级微调**参数，双击滑块即可复位。
-- 🖌 **智能马赛克涂抹（AI 自动贴合面部）**：直接在画布上涂抹或擦除遮挡区域，支持画笔大小（8–120）与强度（0–100%）实时调节。开启「AI 自动贴合面部」后，内置人脸多类别分割模型会自动抠出面部皮肤并避开发丝与下颌轮廓；非人脸区域自动启用边缘感知柔和扩散，并通过「风格前磨砂 + 风格后色度保护」管线无缝兼容全部 8 种滤镜与切片高清导出。
-- 🧠 **4 种本机端 AI 超分与降噪模型**：内置 LiveAction（纹理清晰 ×2）、OmniSR（全频超分 ×2）、RealESR-Anime（动漫线条 ×2）以及 NAFNet（保边自然降噪），支持 WebGPU 硬件加速与 CPU/WASM 兼容模式切换，提供 **4 组质感预设**（自然均衡 / 锐利线条 / 柔和柔焦 / 洁净去噪）与 **4 项后处理微调**（增强混合强度、自适应 USM 锐化、局部质感 Clarity、保边降噪）。
-- 🪄 **智能调色 v2 与 6 维全局光色微调**：本地确定性直方图与中性灰白平衡校正算法，实时输出光色诊断标签（暗部提亮 / 高光收敛 / 动态反差 / 去青暖调 / 去黄校正），支持调色强度及曝光补偿、通透对比、色温冷暖、自然饱和 4 项精调；配合全局亮度、对比度、饱和度、高光、阴影、色温 6 项滑块，自由掌控画面光影。
-- 🖼 **27 款主题拍立得相框**：涵盖纯色经典、梦幻渐变、几何复古、动漫二次元、材质肌理与手账做旧 6 大主题分类，自动匹配照片原生比例并支持 Canvas 高精度渲染与一键随机切换。
-- ✍️ **相框文案、自定义文字与相机 EXIF**：内置 200 条中英文双语精选文案（中英文各 100 条，涵盖 10 大主题与丰富情绪表达，支持按语言与主题筛选；中文模式下随机涵盖中英文，英文模式下默认仅随机英文，也可手动挑选中文文案），支持输入自定义文字（最长 48 字符）；亦可在授权后自动读取相机型号、快门、光圈、ISO 与拍摄日期，优雅印入相纸底部。
-- 📑 **多图标签页与勾选批量导出**：支持同时打开与独立编辑多张照片；通过「选择照片并导出」在侧边栏勾选导出目标（支持全选，点击任一照片即自动切换左侧预览），并支持导出为 **PNG（无损）** 或 **JPEG（高画质轻量）**。
-- ⚡ **多线程切片并行导出与跨端保存**：基于 Web Worker 的 768 px 动态 Halo 切片并行渲染技术，最高支持 24 MP / 单边 12,000 px 高清导出，确保超大尺寸与跨切片风格无缝衔接，并在导出时自动抹除 GPS 与 EXIF 敏感元数据；桌面端与支持的浏览器（Chrome/Edge）可直接选择本地保存文件或文件夹位置，移动端浏览器支持通过系统分享面板一键「保存到手机相册」或使用预览弹窗长按直存。
-- 🌐 **全功能中英双语与 6 款毛玻璃主题色**：内置首次启动语言引导与偏好设置面板，支持实时切换 **简体中文 / English**（覆盖全部风格、参数、相框、文案与桌面原生菜单栏）、**跟随系统 / 浅色 / 深色**外观模式，以及 6 款主题色（天空蓝、樱花粉、薄荷森、落日珀、极光紫、深空靛）。
-- 💻 **macOS & Windows 跨平台全离线运行**：提供 macOS（`.dmg`）与 Windows（NSIS 安装包 / Portable 便携版）双平台桌面端，支持系统级「打开方式」关联、原生拖拽、Dock 拖入、HEIC/HEIF 解码与完整平台快捷键，同时支持 Web 端离线 PWA 运行。
+All image decoding, canvas shader pipelines, and 6 bundled ONNX neural networks execute locally on your device. **No accounts, no API keys, and zero photo uploads.** Your photos never leave your computer.
 
 ---
 
-## 系统架构设计
+## Feature Overview
 
-所有图像解码、滤镜着色器渲染、6 个 ONNX 神经网络推理与高清切片导出均在本地设备完成，无任何云端上传或外部 API 请求：
+- 🎨 **8 Distinct Visual Styles & Quick Presets**: Cel Shaded Anime (Oklab perceptual bilateral filtering), 2D Pixel Line Art (2×2 morphological cleanup + Sobel 4-sector NMS edges), Watercolor & Impasto, Pop Art Halftone, Manga Screentone, Colored Pencil Sketch (**with on-device neural line-art extraction + multi-angle cross-hatching**), Duotone Poster, and Vintage Film. Each style ships with **3 curated preset pills**, **3 core sliders**, and a collapsible **Advanced Tuning** drawer with double-click reset.
+- 🖌 **Smart Mosaic Brush (AI Face Contour Fit)**: Paint or erase mosaic privacy masks directly on the preview canvas with adjustable Brush Size (`8–120`) and Mosaic Strength (`0–100%`). With **AI Face Contour Fit** enabled, the bundled multi-class face segmentation model snaps the mask cleanly to facial skin while keeping hair and jawlines crisp; non-face regions smoothly fall back to edge-aware diffusion. A pre-style frosted diffusion + post-style chroma guard pipeline keeps mosaic zones natural across all 8 styles and tiled HD exports.
+- 🧠 **4 On-Device AI Super-Resolution & Denoise Models**: Powered by ONNX Runtime Web with **WebGPU hardware acceleration** and **CPU/WASM SIMD fallback** (switchable in More Settings). Includes LiveAction (`×2`), OmniSR (`×2`), RealESR-Anime (`×2`), and NAFNet (`1×` denoise), plus **4 Texture Presets** (Balanced, Crisp Lines, Soft Focus, Clean Denoise) and **4 post-processing sliders** (Blend Strength, Adaptive USM Sharpen, Local Clarity, Edge Denoise).
+- 🪄 **Smart Color v2 & 6-Channel Light Adjustments**: Deterministic histogram & neutral-gray white balance optimizer with live diagnostic badges (*Shadows Lifted*, *Highlights Tamed*, *Contrast Boosted*, *Warmed Tone*, *Cast Corrected*), main strength slider, and 4 fine-tuning offsets (Exposure, Tone Contrast, Temperature, Vibrance) — paired with 6 global sliders (Brightness, Contrast, Saturation, Highlights, Shadows, Temperature).
+- 🖼 **27 Themed Instant Polaroid Frames**: Spanning 6 curated categories (Solid Classic, Dreamy Gradient, Retro Pattern, Anime & Pop, Paper & Texture, Collage & DIY), dynamically rendered on Canvas to fit your photo's native aspect ratio with one-click shuffle.
+- ✍️ **200 Bilingual Captions, Custom Text & Camera EXIF**: 100 Chinese and 100 English captions across 10 themes (including rich emotional & healing lines), filterable by language and theme (randomization uses both languages in Chinese UI mode and English-only in English UI mode unless you manually pick/filter Chinese), plus custom text notes (up to 48 characters) and privacy-consented camera EXIF readout (model, shutter speed, aperture, ISO, and capture date).
+- 📑 **Multi-Tab Workspace & Selective Batch Export**: Edit multiple photos in parallel tabs with independent undo/redo history; open *Select & Export* in the sidebar to check photos (with Select All, clicking any photo switches the left canvas preview) and export as **PNG (Lossless)** or **JPEG (Compact)**.
+- ⚡ **Multi-Threaded Tiled HD Export & Cross-Device Saving**: Web Worker 768 px tiled rendering with dynamic style/mosaic halo padding exports up to **24 MP / 12,000 px** seamless PNG or JPEG files while stripping sensitive GPS & EXIF metadata; supports picking save files/folders directly on Desktop and Chromium browsers, and saving straight to Phone Photos via native OS share sheet or long-press preview modal on mobile browsers.
+- 🌐 **Full Bilingual UI & 6 Glassmorphic Theme Palettes**: First-launch language onboarding and Preferences popover for instant live switching between **English / 简体中文** (across all styles, sliders, frames, captions, and native desktop menus), **System / Light / Dark** appearance, and 6 theme colors (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
+- 💻 **macOS & Windows Offline Desktop App & PWA**: Native builds for **macOS** (`.dmg`) and **Windows** (NSIS installer & standalone Portable `.exe`) with HEIC/HEIF decoding, OS file associations, drag-and-drop, Dock drop, platform shortcuts, and offline PWA support.
+
+---
+
+## System Architecture
+
+All image decoding, shader pipelines, 6 ONNX neural networks, and tiled exports execute entirely on-device with zero uploads or external API requests:
 
 ```mermaid
 flowchart TB
-    subgraph Client["客户端宿主层 (100% 离线同源)"]
-        Web["Web / PWA (Service Worker 离线缓存)"]
-        Desktop["Electron 桌面端 (pixel-toon://studio 安全协议 + 严格 CSP)"]
+    subgraph Client["Host Runtime (100% Offline Same-Origin)"]
+        Web["Web / PWA (Service Worker Offline Cache)"]
+        Desktop["Electron Desktop (pixel-toon://studio Protocol + Strict CSP)"]
     end
 
-    subgraph UI["React 编辑器主线程 (ErrorBoundary 容错保护)"]
-        Stage["CanvasStage 画布预览\n(分离视图 / 对比视图 / 双指缩放平移 / 马赛克直涂)"]
-        Sidebar["右侧创作侧边栏 (零遮挡内联面板)\n风格预设 · 核心/高级滑块 · 选框/文案 · 批量导出"]
-        DB["本地持久化\nIndexedDB (工作区/增强结果) + Cache Storage (模型权重)"]
+    subgraph UI["React Editor Main Thread (ErrorBoundary Protected)"]
+        Stage["CanvasStage Preview\n(Split View / Compare View / Pinch Zoom & Pan / Mosaic Brush)"]
+        Sidebar["Non-Blocking Right Sidebar\nPresets · Core & Advanced Sliders · Frames · Batch Export"]
+        DB["Local Storage\nIndexedDB (Workspace/Results) + Cache Storage (Model Weights)"]
     end
 
-    subgraph Workers["Web Worker 并行计算层"]
-        StyleWorker["图像渲染 Worker 池\n8 大确定性风格算法 + 768px Halo 并行切片导出 (PNG/JPEG)"]
-        EnhanceWorker["ai.worker (WebGPU 优先 / WASM SIMD 回退)\nLiveAction · OmniSR · RealESR-Anime · NAFNet"]
-        FaceWorker["faceSeg.worker (WASM)\nface-seg-multiclass 人脸皮肤贴合分割"]
-        PencilWorker["pencilSketch.worker (WebGPU / WASM + LRU 缓存)\npencil-lineart 神经线稿提取"]
+    subgraph Workers["Web Worker Parallel Compute"]
+        StyleWorker["Render Worker Pool\n8 Deterministic Styles + 768px Halo Tiled Export (PNG/JPEG)"]
+        EnhanceWorker["ai.worker (WebGPU First / WASM SIMD Fallback)\nLiveAction · OmniSR · RealESR-Anime · NAFNet"]
+        FaceWorker["faceSeg.worker (WASM)\nface-seg-multiclass Facial Skin Fitting"]
+        PencilWorker["pencilSketch.worker (WebGPU / WASM + LRU Cache)\npencil-lineart Neural Line Extraction"]
     end
 
     Web --> UI
@@ -79,183 +79,201 @@ flowchart TB
     Sidebar --> EnhanceWorker
     Sidebar --> FaceWorker
     Sidebar --> PencilWorker
-    EnhanceWorker -.->|"×2 增强底图"| StyleWorker
-    FaceWorker -.->|"面部贴合遮罩"| StyleWorker
-    PencilWorker -.->|"神经线稿张量"| StyleWorker
+    EnhanceWorker -.->|"×2 Enhanced Base"| StyleWorker
+    FaceWorker -.->|"Face-Fit Mask"| StyleWorker
+    PencilWorker -.->|"Line-Art Tensor"| StyleWorker
 ```
 
 ---
 
-## 实际效果案例
+## Real-World Examples
 
-以下样例均使用默认风格参数直接导出，未经过任何第三方软件二次调色或修图。
+All showcase examples below are direct PNG exports from the application using default style settings, without additional post-processing or third-party retouching.
 
-### 1. 雨天的京都 · 漫画分镜与胶片质感
+### 1. Rainy Kyoto Alley · Comic Ink & Vintage Grain
 
-京都街巷错落的电线、屋檐招牌与石板路反光，非常适合展现线条轮廓与光影细节。**复古胶片**保留街巷温润色调，并赋予细腻的卤化银颗粒、高光晕染与胶片暗角；切换至**黑白日漫**，画面则转为利落的墨线、网点与阴影排线，宛如漫画单行本分镜。
+With intricate overhead wires, traditional eaves, shop signs, and wet pavement reflections, Kyoto street scenes bring out line clarity and lighting depth. **Vintage Film** preserves warm analog tones with soft halation, silver halide grain, and optional vignette, while **Manga Ink** strips the image down to crisp outlines, screentone dots, and cross-hatched shadows.
 
-![京都雨巷：原图、复古胶片与黑白日漫对比](docs/showcase/kyoto.jpg)
+![Kyoto street comparison: original photo, Vintage Film, and Manga Ink](docs/showcase/kyoto.jpg)
 
-> 🔗 查看原尺寸无损导出大图：[京都 · 黑白日漫 PNG](docs/showcase/samples/kyoto-manga.png) · [京都 · 复古胶片 PNG](docs/showcase/samples/kyoto-film.png)
+> 🔗 View uncompressed full-size exports: [Kyoto · Manga Ink PNG](docs/showcase/samples/kyoto-manga.png) · [Kyoto · Vintage Film PNG](docs/showcase/samples/kyoto-film.png)
 
-### 2. 彩色海滨小镇 · 色彩与笔触的碰撞
+### 2. Colorful Coastal Town · Clean Shapes vs. Flowing Pigment
 
-五渔村色彩斑斓的悬崖房屋与蓝绿色海水，是测试色彩分割的理想素材。**赛璐璐动漫风**基于 Oklab 感知双边滤波将色彩提炼为分明的高彩动漫色阶与清晰勾线；而**水彩油画风**通过方向流动笔触与颜料融合，将细节渲染为梦幻的艺术油画感。
+The vibrant cliffside houses and turquoise water of Cinque Terre make an ideal canvas for color separation. **Cel Shaded Anime** leverages Oklab perceptual bilateral filtering to distill tones into vivid animation flats and crisp dark ink. **Watercolor & Impasto** melts architectural details into 16-direction flowing brushwork and wet pigment diffusion.
 
-![海滨小镇：原图、赛璐璐与水彩油画对比](docs/showcase/coast.jpg)
+![Coastal town comparison: original photo, Cel Shade, and Watercolor](docs/showcase/coast.jpg)
 
-> 🔗 查看原尺寸无损导出大图：[海滨小镇 · 水彩油画 PNG](docs/showcase/samples/coast-watercolor.png)
+> 🔗 View uncompressed full-size export: [Coastal Town · Watercolor PNG](docs/showcase/samples/coast-watercolor.png)
 
-### 3. 樱花街道 · 柔和治愈的手绘质感
+### 3. Cherry Blossom Street · Soft Artistic Textures
 
-大面积的粉色花瓣与街景，适合体验手绘笔触与纸张质感。**水彩油画**带来颜料湿画法的晕染与渐变；**彩铅手绘**通过本机 AI 线稿模型提取干净素描轮廓，结合多方向渐细彩铅排线与棉质画纸肌理，还原细腻温柔的手绘质感。
+Dense pink petals and street perspectives highlight painterly blending and paper textures. **Watercolor** delivers delicate wet-on-wet washes, while **Colored Pencil Sketch** pairs the on-device neural line-art model with tapered multi-angle pencil strokes and cotton paper grain.
 
-![樱花街道：原图、水彩油画与彩铅手绘对比](docs/showcase/blossoms.jpg)
+![Cherry blossom street comparison: original photo, Watercolor, and Color Pencil](docs/showcase/blossoms.jpg)
 
-> 🔗 查看原尺寸无损导出大图：[樱花街道 · 彩铅手绘 PNG](docs/showcase/samples/blossoms-pencil.png)
+> 🔗 View uncompressed full-size export: [Cherry Blossoms · Color Pencil PNG](docs/showcase/samples/blossoms-pencil.png)
 
-### 4. 红色老车 · 美漫波普复古网点
+### 4. Red Classic Mustang · Golden-Age Pop Art Halftone
 
-鲜艳的红色车身、轮胎钢圈与蔚蓝天空，在**美漫波普**风格下展现出经典的黄金年代印刷美感：色块分离、Ben-Day 印刷网点、加粗边缘线条与可调的 RGB 错位质感。
+A bright red vintage car against blue skies and mechanical rims is transformed into classic 20th-century pop art. **Pop Art Halftone** renders rotated Ben-Day halftone screens, multi-level posterization, bold comic ink edges, and adjustable RGB chromatic shift.
 
-![红色老车：原图与美漫波普对比](docs/showcase/car-pop.jpg)
+![Red classic Mustang comparison: original photo and Pop Art](docs/showcase/car-pop.jpg)
 
-> 🔗 查看原尺寸无损导出大图：[红色老车 · 美漫波普 PNG](docs/showcase/samples/mustang-pop.png)
+> 🔗 View uncompressed full-size export: [Red Mustang · Pop Art PNG](docs/showcase/samples/mustang-pop.png)
 
 ---
 
-## 风格画廊与参数系统
+## Style Gallery & Tuning System
 
-Pixel & Toon Studio 内置 8 种经过深度算法调校的视觉风格，并在各风格之上叠加 6 项全局光色微调（亮度、对比度、饱和度、高光、阴影、色温）：
+Pixel & Toon Studio includes 8 deeply tuned visual styles, layered with 6 global light & color sliders (Brightness, Contrast, Saturation, Highlights, Shadows, Temperature):
 
-![8 种风格实际输出画廊](docs/showcase/styles.jpg)
+![Eight styles gallery using actual exports](docs/showcase/styles.jpg)
 
-| 风格名称 | 核心算法与视觉特征 | 可调参数 |
+| Style Name | Core Pipeline & Visual Character | Adjustable Parameters |
 | :--- | :--- | :--- |
-| **赛璐璐动漫风** (`cel`) | Oklab 感知双边滤波平滑、动画色阶与利落勾线 | 色阶 (2–12 级)、墨线强度、边缘灵敏度、背景保护、色阶融合、色彩鲜明 |
-| **2D 线条像素** (`pixel`) | 2×2 形态学开闭清理、Sobel + 4 方向 NMS 边缘、主色块降采样 | 像素尺寸 (2–20 px)、边缘锐度、噪点清理、色块数量 (2–24 色)、主色锁定、色彩对比 |
-| **水彩油画风** (`watercolor`) | 16 方向颜料流动与笔触融合、厚涂柔化与纸面暖调 | 笔触尺寸 (2–18 px)、画意强度、颜料融合、细节保留、颜料浓艳、纸面暖调 |
-| **美漫波普网点** (`halftone`) | Ben-Day 旋转网点、多级色块分离与 RGB 分色错版 | 网点大小 (2–18)、网点强度、墨线强度、RGB 错位、色块强度、色阶数 (2–10 级) |
-| **黑白日漫** (`manga`) | 传统漫画手绘稿、网点阴影、留白保护与暗部排线 | 网点尺寸 (2–16 px)、墨线强度、阴影层次 (2–10 级)、留白保护、黑白反差、阴影排线 |
-| **彩铅手绘** (`pencil`) | **AI 线稿提取**（含 XDoG/Sobel 回退）、多角度彩铅排线与棉纸肌理 | 笔触尺寸 (1–12 px)、线稿强度、彩铅浓度、纸张质感、交叉排线、纸色冷暖 |
-| **双色海报** (`duotone`) | 现代极简双色丝网印刷，内置暗部/亮部实时配色预览 | 暗部色相 (0–359°)、亮部色相 (0–359°)、分色位置、层次保留、色彩浓烈、明暗反差 |
-| **复古胶片** (`film`) | 胶片褪色曲线、银盐颗粒、柔化涂抹、高光光晕与暗角 | 褪色强度、颗粒强度、柔化涂抹、色温、高光晕染、绿品偏色、胶片暗角 |
+| **Cel Shaded Anime** (`cel`) | Oklab perceptual bilateral flattening, cel tone steps & crisp ink | Color Levels (2–12), Ink Lines, Edge Sensitivity, BG Protection, Cel Blend, Color Pop |
+| **2D Pixel Line Art** (`pixel`) | 2×2 morph open/close cleanup, Sobel + 4-sector NMS edges & dominant-color blocks | Pixel Size (2–20 px), Edge Sharpness, Morph Cleanup, Color Count (2–24), Dominant Mode, Contrast |
+| **Watercolor & Impasto** (`watercolor`) | 16-direction paint flow, impasto softening & warm paper wash | Brush Size (2–18 px), Paint Flow, Pigment Blend, Detail Keep, Pigment Vivid, Paper Wash |
+| **Pop Art Halftone** (`halftone`) | Rotated Ben-Day dots, posterized color planes & RGB shift | Dot Size (2–18), Dot Density, Ink Lines, RGB Shift, Posterize, Color Levels (2–10) |
+| **Manga Screentone** (`manga`) | Hand-drawn ink lines, halftone screentones, highlight guard & shadow cross-hatch | Tone Size (2–16 px), Ink Lines, Shade Levels (2–10), White Guard, Ink Contrast, Cross-Hatch |
+| **Colored Pencil Sketch** (`pencil`) | **AI Neural Line Art** (with XDoG/Sobel fallback), contour-following strokes & cotton paper tooth | Stroke Size (1–12 px), Sketch Line, Pigment Richness, Paper Grain, Cross-Hatch, Paper Tone |
+| **Duotone Poster** (`duotone`) | Minimalist two-tone screenprint with live shadow/highlight palette swatches | Shadow Hue (0–359°), Highlight Hue (0–359°), Tone Split, Detail Keep, Color Richness, Poster Contrast |
+| **Vintage Film** (`film`) | Analog fade curve, silver halide grain, soft diffusion, halation & vignette | Film Fade, Film Grain, Soft Diffusion, Warmth, Halation, Tint, Vignette |
 
-> 💡 **参数调节小贴士**：每款风格均提供 **3 组一键预设胶囊**与 **3 项核心主滑块**，其余参数收起在可折叠的「高级微调」抽屉中；所有风格滑块、智能调色滑块与全局光色滑块均支持实时响应，**双击任意滑块**即可快速恢复为默认数值。
+> 💡 **Tuning Tip**: Every style includes **3 quick preset pills** and **3 core sliders**, with remaining parameters tucked into a collapsible **Advanced Tuning** drawer. All style, Smart Color, and global adjustment sliders update in real time — **double-click any slider** to restore its default value.
 
 ---
 
-## 本机端 AI 引擎与模型矩阵
+## On-Device AI Engine & Model Matrix
 
-软件内置 **6 个本地 ONNX 神经网络模型**（由 `scripts/verify-model.mjs` 在构建时强制校验 SHA-256 哈希、张量 I/O 与算子图），全部通过 ONNX Runtime Web 在独立 Web Worker 中离线执行，优先使用 **WebGPU 硬件加速**，并支持无缝回退或手动切换至 **WASM SIMD 多线程（CPU 兼容模式）**。
+The application bundles **6 local ONNX neural models** (integrity-checked at build time by `scripts/verify-model.mjs` for SHA-256 hash, tensor I/O layout, and operator graph). All models run inside dedicated Web Workers via ONNX Runtime Web with **WebGPU acceleration** first and seamless **WASM SIMD CPU fallback / compatibility mode**.
 
-| 模型 ID | 用途模块 | 倍率 / 规格 | 开源协议 | 核心作用 |
+| Model ID | Module | Scale / Spec | License | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| `liveaction-span-x2` | 照片增强 · 纹理清晰 | ×2 超分 (1.65 MB) | Apache-2.0 | 重建真实照片的头发、织物与自然纹理细节 |
-| `omnisr-x2` | 照片增强 · 全频超分 | ×2 超分 (3.79 MB) | Apache-2.0 | Omni-SR 全频域注意力，兼顾宏观轮廓与微纹理 |
-| `realesr-anime-x2` | 照片增强 · 动漫线条 | ×2 超分 (2.41 MB) | BSD-3-Clause | 专为插画与二次元打造，线条锐利并抑制网点瑕疵 |
-| `nafnet-denoise` | 照片增强 · 颗粒降噪 | 1× 降噪 (0.20 MB) | MIT | 非线性保边降噪，抑制暗部颗粒与彩噪，拒绝涂抹感 |
-| `face-seg-multiclass` | 智能马赛克 · 面部贴合 | 256×256 分割 (16.45 MB) | Apache-2.0 | MediaPipe 多类别分割，自动抠出面部皮肤并避开发丝轮廓 |
-| `pencil-lineart` | 彩铅手绘 · 神经线稿 | ≤640 px 动态尺寸 (17.19 MB) | MIT | Informative Drawings 线稿网络，生成自然流畅的铅笔素描线稿 |
+| `liveaction-span-x2` | Photo Enhancement · Natural Detail | ×2 Upscale (1.65 MB) | Apache-2.0 | Reconstructs hair, fabric, and natural real-world textures |
+| `omnisr-x2` | Photo Enhancement · Omni-SR ×2 | ×2 Upscale (3.79 MB) | Apache-2.0 | Full-frequency attention balancing macro structure & micro detail |
+| `realesr-anime-x2` | Photo Enhancement · Anime Line | ×2 Upscale (2.41 MB) | BSD-3-Clause | Compact anime/illustration upscaler with clean lines & low ringing |
+| `nafnet-denoise` | Photo Enhancement · Natural Denoise | 1× Denoise (0.20 MB) | MIT | Edge-preserving denoiser removing low-light chroma noise without plastic blur |
+| `face-seg-multiclass` | Smart Mosaic · AI Face Fit | 256×256 Seg (16.45 MB) | Apache-2.0 | MediaPipe multi-class segmentation snapping masks cleanly to facial skin |
+| `pencil-lineart` | Colored Pencil · Neural Line Art | Dynamic ≤640 px (17.19 MB) | MIT | Informative Drawings network producing expressive pencil contour sketches |
 
-### 1. AI 照片超分与质感增强
+### 1. AI Super-Resolution & Denoise
 
-![低分辨率海滨照片：普通插值放大与 LiveAction ×2 局部细节对比](docs/showcase/enhancement.jpg)
+![Low-resolution coastal comparison: standard interpolation vs. LiveAction 2x super-resolution](docs/showcase/enhancement.jpg)
 
-- **智能切片与缓存**：支持最高 **6 MP** 输入（输出最高 **24 MP / 单边 12,000 px**），自动切片并缓存在本地 IndexedDB 中，支持一键清理闲置结果或清除模型缓存。
-- **4 组质感预设与 4 项精调**：一键切换「自然均衡 / 锐利线条 / 柔和柔焦 / 洁净去噪」，自由调节**增强混合强度 (0–100%)**、**自适应 USM 锐化 (0–100%)**、**局部质感 Clarity (-50–100)** 与**保边降噪 (0–100%)**。
-- **独立底图导出**：支持单独保存增强后的无损高清底图 PNG，也可直接作为后续全部艺术风格滤镜的底图输入。
+- **Smart Tiling & Caching**: Supports up to **6 MP** input (up to **24 MP / 12,000 px** max side output), caching results in IndexedDB with one-click cleanup for unused results or cached models.
+- **4 Texture Presets & 4 Sliders**: Switch between *Balanced*, *Crisp Lines*, *Soft Focus*, and *Clean Denoise*, or dial in **Blend Strength (0–100%)**, **Adaptive Sharpen USM (0–100%)**, **Local Clarity (-50–100)**, and **Edge Denoise (0–100%)**.
+- **Standalone Base Export**: Save the enhanced base image directly as PNG, or feed it into any artistic style filter.
 
-### 2. 智能马赛克涂抹（AI 自动贴合面部）
+### 2. Smart Mosaic Brush (AI Face Contour Fit)
 
-- **画布直涂交互**：在创作面板开启「涂抹画笔」或「橡皮擦」后，直接在右侧预览画布拖动即可绘制或擦除遮挡区域，支持实时光标预览、撤销一笔与一键清空。
-- **AI 面部轮廓吸附**：当「AI 自动贴合面部」开启时，Worker 会自动聚类笔刷覆盖区域并调用 `face-seg-multiclass` 模型分离面部皮肤与头发、衣物及背景，精准贴合脸部轮廓；非人脸区域自动退化为边缘感知柔和扩散。
-- **全风格跨切片兼容**：通过前置低感磨砂扩散 + 有机微颗粒注入（`applyPreStyleMosaic`）以及滤镜后色度保护（`applyPostStyleChromaGuard`），确保马赛克区域在赛璐璐、美漫波普、水彩、彩铅等全部 8 种风格与大图切片导出中自然融合、无接缝。
+- **Interactive Canvas Brushing**: Activate *Mosaic Brush* or *Eraser* to paint directly on the canvas with real-time cursor feedback, stroke undo, and clear all.
+- **AI Facial Skin Snapping**: When *AI Face Contour Fit* is enabled, strokes are clustered into portrait crops and processed by `face-seg-multiclass` to lock onto facial skin while preserving hair and jawlines; non-face strokes automatically use edge-aware diffusion.
+- **Cross-Style & Tile-Safe Pipeline**: Pre-style frosted mosaic + organic micro-grain (`applyPreStyleMosaic`) and post-style chroma guard (`applyPostStyleChromaGuard`) keep masked regions clean across all 8 styles and seamless across tiled exports.
 
-### 3. 智能调色 v2（本地确定性光色优化）
+### 3. Smart Color v2 (Deterministic Lighting & White Balance)
 
-- **自动光色分析**：开启「优化底图光色」后，算法会基于全图直方图与中性灰高光采样自动计算曝光、对比度与白平衡增益，并展示实时诊断标签（如「暗部提亮 · 动态反差 · 去青暖调」）。
-- **5 项可控滑块**：提供整体「调色强度 (0–100%)」及「曝光补偿」「通透对比」「色温冷暖」「自然饱和」（均支持 -50 至 +50 微调与一键重置）。
-
----
-
-## 拍立得相框与定制卡片
-
-你可以为照片开启拍立得相纸边框，将其打造成一张张精致的实体感艺术卡片。
-
-![京都胶片、海边水彩与樱花彩铅的真实相框成品](docs/showcase/postcards.jpg)
-
-### 1. 27 款主题相框外观
-
-涵盖 6 大类别，内置直观的可视化选择器、分类筛选与一键随机切换：
-
-- **纯色经典 (6 款)**：#01 经典象牙白、#02 暗房纯黑、#03 樱花奶粉、#04 薄荷苏打、#05 奶油鹅黄、#06 雾霾灰蓝。
-- **梦幻渐变 (4 款)**：#07 日落晚霞、#08 Y2K 千禧光晕、#09 赛博霓虹、#10 抹茶拿铁。
-- **几何复古 (4 款)**：#11 复古棋盘格、#12 波普圆点、#13 糖果条纹、#14 水洗牛仔。
-- **动漫二次元 (5 款)**：#15 日漫网点、#16 热血速度线、#17 8-bit 像素 RPG、#18 魔法星芒、#19 蒸汽波视窗。
-- **材质肌理 (4 款)**：#20 牛皮纸复古、#21 金属银拉丝、#22 胶片盘齿孔、#23 揉皱和纸。
-- **手账与做旧 (4 款)**：#24 彩色和纸胶带、#25 航空明信片、#26 哥特荆棘、#27 双重画框。
-
-### 2. 200 条双语文案与自定义文字
-
-- **200 条中英文随行文案（各 100 条）**：覆盖日常碎片、出逃计划、城市漫游、山野来信、见面快乐、恋爱日常、随便发发、极简短句、情绪碎片、治愈微光 10 大主题，支持按语言与主题快速筛选；中文模式下随机抽取涵盖中英文，英文模式下默认仅随机英文文案（仍可手动挑选或筛选中文文案）。
-- **自定义文字输入**：在弹窗中直接输入地点打卡、心情随笔或日期备忘（最多 48 字符），自动居中排版于相纸底部。
-
-### 3. 相机 EXIF 拍摄参数读取
-
-- 导入带有 EXIF 元数据的照片时，会在右侧栏顶部以零遮挡内联卡片提示隐私授权；同意后仅读取**相机型号、快门速度、光圈值、ISO 与拍摄日期**，自动替代文案印入相纸底部，呈现专业摄影数据卡片质感。
+- **Automatic Diagnostics**: Analyzes full-frame luminance histograms and near-neutral highlights to balance exposure, dynamic range, and color cast, surfacing live tags (*Shadows Lifted*, *Highlights Tamed*, *Contrast Boosted*, *Warmed Tone*, *Cast Corrected*).
+- **Fine-Tuning Offsets**: Adjust overall *Color Strength (0–100%)* plus *Exposure*, *Tone Contrast*, *Temperature*, and *Vibrance* (`-50` to `+50`) with one-click reset.
 
 ---
 
-## 舒适好用的操作细节
+## Instant Polaroid Frames & Kept Cards
 
-- 🌐 **双语支持、内联引导与错误本地化**：首次启动在右侧栏顶部提供零遮挡内联双语引导；右上角「设置」面板支持随时切换 **简体中文 / English**，风格参数、相框类别、文案主题、Worker 推理进度、错误提示与桌面端原生菜单栏实时联动。
-- 🎨 **主题色与个性化外观**：支持**跟随系统 / 浅色 / 深色**外观模式，搭配 6 款精选主题色（天空蓝、樱花粉、薄荷森、落日珀、极光紫、深空靛）。
-- 🖥️ **跨平台桌面端专属优化**：macOS 支持磨砂可拖拽顶栏、Dock 拖入打开与 `Cmd` 快捷键；Windows 支持深浅色无缝标题栏、NSIS 安装向导、绿色便携版（Portable）、多分辨率 `.ico` 图标、资源管理器文件关联与 `Ctrl` 快捷键。
-- 📱 **多格式与多入口导入**：支持 iPhone / iPad 原生 **HEIC / HEIF**、PNG、JPEG 与 WebP（最大导入 24 MP / 单边 12,000 px）；支持点击选择、系统拖拽与剪贴板粘贴（`Cmd/Ctrl + V`）。
-- 📑 **多标签工作区、双格式与跨端批量导出**：每张照片独立保存编辑状态与历史栈；在侧边栏打开「选择照片并导出」支持全选/取消、点击切换左侧预览，并可选择 **PNG 无损** 或 **JPEG 轻量（92% 质量）** 导出；桌面端与支持的浏览器（Chrome/Edge）可直接指定保存文件或批量导出文件夹，手机/平板浏览器则自动唤起系统分享面板存入相册（或弹出支持长按存图与文件下载的移动端保存面板，兼容单张、批量及增强底图导出）。
-- 👁 **双模式实时对比与触屏/桌面缩放平移**：画布左下角提供「分离视图」（可拖拽分割线对比）与「对比视图」（原图与处理效果并排双栏同步缩放平移）快捷切换，编辑任意参数时长按 **空格键 (Space)** 即可瞬时偷窥原图，松开恢复；支持工具栏按钮（`−` / `适应` / `+`）、以鼠标为锚点的滚轮/触控板缩放、移动端**双指捏合同步缩放平移**、单指拖动平移与**双击快速放大/还原**（`100%–500%`，涂抹马赛克时桌面端可按住 `Alt` 或中键平移），触屏设备自动显示手势操作提示。
-- ↶ **完整撤销/重做、本地持久化与容错恢复**：支持 `Cmd/Ctrl + Z` 撤销与 `Cmd/Ctrl + Shift + Z` 重做；工作区状态与增强结果自动持久化至本机 IndexedDB，重启或刷新后无缝恢复，并内置全局 `ErrorBoundary` 异常恢复保护。
-- 🛡 **零上传隐私设计**：所有计算 100% 在本机完成，导出高清 PNG / JPEG 时自动剥离 GPS 定位及原始 EXIF 元数据。
+Turn any styled photograph into a tangible instant keepsake card.
+
+![Framed exports: Kyoto in Vintage Film, the coast in Watercolor, and cherry blossoms in Color Pencil](docs/showcase/postcards.jpg)
+
+### 1. 27 Themed Frame Styles
+
+Organized into 6 categories with a visual picker, category filter, and random shuffle:
+- **Solid Classic (6)**: #01 Classic Ivory, #02 Darkroom Black, #03 Sakura Blush, #04 Mint Soda, #05 Buttercream Yellow, #06 Mist Blue.
+- **Dreamy Gradient (4)**: #07 Sunset Glow, #08 Y2K Aura, #09 Cyber Neon, #10 Matcha Latte.
+- **Retro Pattern (4)**: #11 Retro Checkerboard, #12 Pop Polka, #13 Candy Stripes, #14 Indigo Denim.
+- **Anime & Pop (5)**: #15 Manga Screentone, #16 Action Speedlines, #17 8-Bit Pixel RPG, #18 Magical Starlight, #19 Vaporwave Window.
+- **Paper & Texture (4)**: #20 Kraft Paper, #21 Brushed Silver, #22 35mm Film Strip, #23 Crumpled Washi Paper.
+- **Collage & DIY (4)**: #24 Washi Tape, #25 Airmail Postcard, #26 Gothic Thorn, #27 Double Mat Border.
+
+### 2. 200 Bilingual Captions & Custom Typography
+
+- **200 Curated Captions (100 ZH + 100 EN)**: Spanning 10 themes (*Daily Moments*, *Getaway*, *City Walk*, *Into Nature*, *With Friends*, *Sweet Time*, *Photo Dump*, *Minimal*, *Mood & Feels*, *Soft & Healing*), filterable by language and theme. Randomization picks from both Chinese and English in Chinese UI mode, and from English only in English UI mode unless you manually select or filter for Chinese captions.
+- **Custom Note Input**: Type custom places, dates, or notes (up to 48 characters) directly in the picker dialog.
+
+### 3. Native Camera EXIF Readout
+
+- Displays a non-blocking inline privacy consent card at the top of the sidebar before parsing camera model, shutter speed, aperture, ISO, and capture date, printing genuine photography specs onto the frame border.
 
 ---
 
-## 本地开发与构建
+## Thoughtful Workflow Features
 
-需要 **Node.js 20+**（macOS 桌面端打包需在 macOS 环境执行）：
+- 🌐 **Inline Onboarding, Bilingual UI & Localized Errors**: Non-blocking inline language selector on first launch plus a top-bar Preferences popover for instant switching between English and Simplified Chinese across all UI controls, Worker progress/error messages, and native desktop menus.
+- 🎨 **Adaptive Themes & 6 Color Palettes**: System, Light, and Dark modes paired with 6 curated palettes (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
+- 🖥️ **Desktop & Web Integrations**: macOS frosted draggable title bar, Dock drop, and `Cmd` shortcuts; Windows native title bar, NSIS installer, standalone Portable `.exe`, multi-resolution `.ico`, Explorer "Open With", and `Ctrl` shortcuts.
+- 📱 **Wide Format Support**: Native **HEIC / HEIF** (iPhone/iPad), PNG, JPEG, and WebP up to 24 MP / 12,000 px via file picker, drag-and-drop, or clipboard paste (`Cmd/Ctrl + V`).
+- 📑 **Multi-Tab Workspace, Dual Format & Cross-Device Batch Export**: Independent per-tab state and history; open *Select & Export* in the sidebar for Select All/Deselect All, click-to-preview, and batch export in **PNG (Lossless)** or **JPEG (Compact, 92% quality)**, with direct file/folder picking on Desktop and Chromium browsers, and native OS share-to-Photos or a long-press preview sheet with download fallback on mobile browsers (for single, batch, and enhanced base exports).
+- 👁 **Dual Comparison Modes & Touch/Desktop Zoom & Pan**: Bottom-left view buttons toggle *Split View* (draggable divider) and *Compare View* (synchronized side-by-side Original vs. Styled panes), while holding **Spacebar** anywhere peeks at the original photo; zoom (`100%–500%`) via toolbar buttons (`−` / `Fit` / `+`), cursor-anchored wheel or trackpad pinch, **two-finger pinch-to-zoom with simultaneous midpoint pan**, single-finger drag pan (or `Alt`+drag / middle-click on desktop while Mosaic Brush is active), and **double-click / double-tap** to zoom or reset, with adaptive touch gesture hints.
+- ↶ **Undo/Redo, Persistence & Recovery**: Full `Cmd/Ctrl + Z` / `Cmd/Ctrl + Shift + Z` history, automatic IndexedDB persistence, and a top-level React `ErrorBoundary` offering one-click recovery or reload without losing local photos.
+- 🛡 **Zero-Leak Privacy**: All computation stays on your CPU/GPU; exported PNGs and JPEGs automatically strip GPS and EXIF metadata.
+
+---
+
+## Local Development & Building
+
+Requires **Node.js 20+** (macOS packaging requires macOS):
 
 ```bash
-# 1. 克隆代码仓库
-git clone https://github.com/feihanwen0928-eng/pixel-toon-studio.git
+# 1. Clone repository
+git clone https://github.com/feihanwen/pixel-toon-studio.git
 cd pixel-toon-studio
 
-# 2. 安装依赖
+# 2. Install dependencies
 npm install
 
-# 3. 启动本地开发服务器
+# 3. Launch local development server
 npm run dev
 
-# 4. 运行类型检查、模型完整性校验与全套单元测试 (26 个测试文件，172 个测试用例)
+# 4. Run typecheck, model integrity verification, and full unit test suite (26 suites, 172 tests)
 npm run typecheck
 npm run verify:model
 npm run test:run -- --maxWorkers=1
 
-# 5. 构建 Web 生产包并本地预览
+# 5. Build production bundle & preview locally
 npm run build
 npm start
 
-# 6. 启动或打包 macOS / Windows 桌面端应用
-npm run desktop:start # 构建并启动 Electron 桌面端
-npm run desktop:mac   # 构建 macOS DMG 安装包
-npm run desktop:win   # 构建 Windows NSIS 安装包与 Portable 便携版
+# 6. Run or package Desktop App for macOS / Windows
+npm run desktop:start # Build and launch Electron desktop app
+npm run desktop:mac   # Build macOS DMG installer
+npm run desktop:win   # Build Windows NSIS installer & Portable executable
 ```
 
-更多目录结构、测试命令（含浏览器 E2E 与桌面端回归脚本）及限制说明请参阅 [开发说明文档 (docs/DEVELOPMENT.md)](docs/DEVELOPMENT.md)。
+For detailed architecture notes, worker pipelines, E2E scripts, and packaging steps, see the [Development Guide (docs/DEVELOPMENT.md)](docs/DEVELOPMENT.md).
 
 ---
 
-## 鸣谢与许可
+## Architecture & Original Engineering
 
-- **摄影作品**：感谢 Unsplash 摄影师 **Hamza ERBAY**、**Sung Jin Cho**、**Stephan Widua**、**Bernard Guevara** 提供的优质原图素材。详细原片信息与拍摄说明见 [原图来源说明文档](docs/showcase/SOURCES.md)。
-- **文案引用**：[文案来源说明文档](docs/CAPTION_SOURCES.md)。
-- **开源协议**：本项目基于 [MIT License](LICENSE) 协议开源。第三方开源依赖与内置模型许可证声明见 [第三方许可声明](desktop/THIRD_PARTY_NOTICES.md) 及各模型目录下的 `LICENSE` 文件。
+To make technical boundaries transparent for reviewers, contributors, and open-source compliance, this project separates **custom-engineered algorithms & system infrastructure** from **third-party pretrained neural models**:
+
+### 1. Original Engineering & Custom Algorithms (Written in TypeScript)
+- **Perceptual Oklab Stylization (`src/worker/shared/oklab.ts`, `src/worker/styles/cel.ts`)**: Custom separable Oklab bilateral filtering and hue-locked lightness quantization to prevent RGB channel-clipping and skin-tone hue drift in Cel Shaded Anime.
+- **Structure-Tensor Painterly Rendering (`src/worker/styles/watercolor.ts`, `src/worker/styles/pencil.ts`)**: Local gradient covariance (structure tensor) orientation fields driving 16-direction anisotropic impasto brushwork, paired with multi-angle tapered colored-pencil cross-hatching.
+- **Seamless Multi-Threaded Tiled Export (`src/imaging/exportHalo.ts`, `src/imaging/export.ts`, `src/enhancement/local/rgbTiles.ts`)**: Dynamic per-style `exportHalo` padding and global coordinate anchoring for artifact-free 768 px Web Worker tiled exports up to 24 MP, plus cosine-feathered Catmull-Rom tile fusion for AI super-resolution.
+- **Cross-Style Privacy Mosaic Pipeline (`src/mosaic/mosaicEngine.ts`, `src/mosaic/maskMath.ts`)**: Mask-normalized pre-style frosted diffusion with sensor-matched micro-grain injection and a post-style chroma guard that keeps stylized highlights/textures intact without halo staining.
+- **Deterministic Lighting & White Balance (`src/imaging/autoColor.ts`)**: Local histogram and neutral-gray highlight sampler with bidirectional gamma recovery and live diagnostic tags.
+- **On-Device Security & Integrity (`scripts/verify-model.mjs`, `desktop/main.mjs`, `src/enhancement/local/ai.worker.ts`)**: Build-time Protobuf ONNX operator-graph & SHA-256 verification, runtime same-origin checksum checks, WebGPU-to-WASM SIMD automatic fallback, Electron `pixel-toon://` custom protocol with `trustedSender` IPC validation, and automatic EXIF/GPS stripping on export.
+
+### 2. Third-Party Pretrained Models & Open-Source Attribution
+All 6 bundled ONNX weights are unmodified open-source pretrained models executed locally via ONNX Runtime Web (full notices in [Third-Party Notices](desktop/THIRD_PARTY_NOTICES.md) and each model's `LICENSE` file):
+- **Super-Resolution & Denoise**: `liveaction-span-x2` (Apache-2.0), `omnisr-x2` (Apache-2.0), `realesr-anime-x2` (BSD-3-Clause), `nafnet-denoise` (MIT).
+- **Face Segmentation & Line Art**: `face-seg-multiclass` (MediaPipe, Apache-2.0), `pencil-lineart` (Informative Drawings, MIT).
+
+---
+
+## Credits & License
+
+- **Photography Credits**: Grateful acknowledgment to Unsplash photographers **Hamza ERBAY**, **Sung Jin Cho**, **Stephan Widua**, and **Bernard Guevara**. Detailed image sources and documentation can be found in the [Image Credits and Production Notes](docs/showcase/SOURCES.md).
+- **Caption References**: [Caption Sources Documentation](docs/CAPTION_SOURCES.md).
+- **Open Source License**: This project is licensed under the [MIT License](LICENSE). Third-party dependencies and bundled model licenses are listed in [Third-Party Notices](desktop/THIRD_PARTY_NOTICES.md) and each model directory's `LICENSE` file.

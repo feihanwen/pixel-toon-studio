@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { defaultParams, STYLES } from '../src/config/styles';
 import { exportHalo } from '../src/imaging/exportHalo';
+import { initialSnapshot, normalizeHistory } from '../src/state/history';
+import { render } from '../src/worker/pipeline';
 import { clamp } from '../src/worker/shared/color';
 import { popArt } from '../src/worker/styles/popArt';
 import { fixture, flat, metrics, processStyle } from './style-fixtures';
@@ -132,5 +134,37 @@ describe('bold pop-art halftone style', () => {
             expect(diff.mad).toBeLessThan(0.05);
             expect(diff.max).toBeLessThanOrEqual(2);
         }
+    });
+
+    it('always dispatches the bold pop-art renderer without a version switch', () => {
+        const src = fixture(128, 192);
+        const params = defaultParams().halftone;
+        const ctx = { originX: 0, originY: 0, fullWidth: 128, fullHeight: 192, scale: 1 };
+        const req = {
+            kind: 'render' as const,
+            id: 1,
+            tabId: 'a',
+            revision: 1,
+            mode: 'export' as const,
+            width: 128,
+            height: 192,
+            ...ctx,
+            styleId: 'halftone' as const,
+            params,
+            global: { brightness: 0, contrast: 0, saturation: 0 },
+        };
+        const expected = popArt(src, 128, 192, params, ctx);
+        expect(new Uint8ClampedArray(render({ ...req, buffer: src.slice().buffer }))).toEqual(expected);
+    });
+
+    it('migrates legacy snapshots directly to current halftone and autoColor defaults', () => {
+        const raw = JSON.parse(JSON.stringify(initialSnapshot()));
+        delete raw.styleVersions;
+        delete raw.autoColor.algorithmVersion;
+        delete raw.params.halftone.poster;
+        const legacy = normalizeHistory({ entries: [raw, structuredClone(raw)], cursor: 0 });
+        expect(legacy.entries.every(s => s.params.halftone.poster === 90 && s.autoColor.algorithmVersion === 1)).toBe(true);
+        expect(normalizeHistory(legacy)).toEqual(legacy);
+        expect(initialSnapshot().params.halftone).toEqual({ dot: 6, density: 45, ink: 55, shift: 0, poster: 90, levels: 5 });
     });
 });
