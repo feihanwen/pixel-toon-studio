@@ -1,4 +1,5 @@
-export const MAX_PIXELS = 24000000;
+export const MAX_PIXELS = 25000000;
+export const MOBILE_EXPORT_MAX_PIXELS = 14000000;
 export const MAX_SIDE = 12000;
 export const PREVIEW_SIDE = 1600;
 export const MOBILE_PREVIEW_SIDE = 960;

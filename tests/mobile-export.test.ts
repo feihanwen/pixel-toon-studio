@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     blobToShareFile,
     canNativeShareFiles,
+    capMobileExportSize,
     isMobileBrowser,
     tryShareFilesToPhotos,
 } from '../src/imaging/export';
@@ -101,5 +102,13 @@ describe('mobile export helpers', () => {
                 share: vi.fn(),
             } as unknown as Navigator),
         ).toBe(false);
+    });
+
+    it('caps oversized mobile exports under WebKit canvas limits while keeping desktop full-res', () => {
+        expect(capMobileExportSize(4284, 5712, false)).toEqual({ width: 4284, height: 5712 });
+        const mobile = capMobileExportSize(4284, 5712, true);
+        expect(mobile.width * mobile.height).toBeLessThanOrEqual(14000000);
+        expect(mobile.width).toBeGreaterThan(3000);
+        expect(mobile.height).toBeGreaterThan(4000);
     });
 });

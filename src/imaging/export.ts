@@ -1,4 +1,4 @@
-import { EXPORT_TILE, PREVIEW_SIDE } from '../config/limits';
+import { EXPORT_TILE, MOBILE_EXPORT_MAX_PIXELS, PREVIEW_SIDE } from '../config/limits';
 import { currentMsg } from '../config/errors';
 import { exportHalo } from './exportHalo';
 import { decode } from './decode';
@@ -163,6 +163,20 @@ export async function runParallelPool<T>(
     await Promise.all(runners);
 }
 
+export function capMobileExportSize(
+    width: number,
+    height: number,
+    mobile: boolean,
+    maxPixels = MOBILE_EXPORT_MAX_PIXELS,
+): { width: number; height: number } {
+    if (!mobile || width * height <= maxPixels) return { width, height };
+    const fit = Math.sqrt(maxPixels / (width * height));
+    return {
+        width: Math.max(1, Math.floor(width * fit)),
+        height: Math.max(1, Math.floor(height * fit)),
+    };
+}
+
 export async function exportImage(
     tab: PhotoTab,
     content: FrameContent,
@@ -174,7 +188,32 @@ export async function exportImage(
     const s = snapshot(tab);
     const colorPlan = await autoColorPlan(tab, s);
     const base = await exportBase(tab, s);
-    const bitmap = await decode(base.blob);
+    let bitmap = await decode(base.blob);
+    const capped = capMobileExportSize(bitmap.width, bitmap.height, isMobileBrowser());
+    if (capped.width !== bitmap.width || capped.height !== bitmap.height) {
+        try {
+            const resized = await createImageBitmap(bitmap, {
+                resizeWidth: capped.width,
+                resizeHeight: capped.height,
+                resizeQuality: 'high',
+            });
+            bitmap.close();
+            bitmap = resized;
+        } catch {
+            const fitCanvas = document.createElement('canvas');
+            fitCanvas.width = capped.width;
+            fitCanvas.height = capped.height;
+            const fitCtx = fitCanvas.getContext('2d');
+            if (fitCtx) {
+                fitCtx.drawImage(bitmap, 0, 0, capped.width, capped.height);
+                const resized = await createImageBitmap(fitCanvas);
+                bitmap.close();
+                bitmap = resized;
+            }
+            fitCanvas.width = 1;
+            fitCanvas.height = 1;
+        }
+    }
     const w = bitmap.width;
     const h = bitmap.height;
     const scale = Math.max(1, Math.max(w, h) / PREVIEW_SIDE);

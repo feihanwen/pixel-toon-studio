@@ -7,6 +7,7 @@ import { initialSnapshot, normalizeHistory } from '../src/state/history';
 describe('enhancement contracts', () => {
     it('protects output allocations before inference', () => {
         expect(() => checkDimensions(3000, 2000, 2)).not.toThrow();
+        expect(() => checkDimensions(4284, 5712, 1)).not.toThrow();
         expect(() => checkDimensions(4000, 3000, 2)).toThrow('24 MP');
         for (const n of [NaN, Infinity, -1, 0, 1.3]) expect(() => checkDimensions(n, 1)).toThrow();
     });
