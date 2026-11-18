@@ -50,7 +50,7 @@ import { autoColorPlan, basePixels, resolveBase } from './enhancement/images';
 import { cancelAllEnhancements, cancelEnhancement, runEnhancement, type EnhancementRequest } from './enhancement/orchestrator';
 import { activeTask, type EnhancementTask } from './types/enhancement';
 import { referencedResults } from './storage/enhancementStore';
-import { PREVIEW_SIDE } from './config/limits';
+import { MOBILE_PREVIEW_SIDE, PREVIEW_SIDE } from './config/limits';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
 import { useDesktopIntegration } from './hooks/useDesktopIntegration';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
@@ -206,7 +206,7 @@ function AppContent() {
                     bitmap.close();
                     return;
                 }
-                const data = toImageData(bitmap);
+                const data = toImageData(bitmap, isMobileBrowser() ? MOBILE_PREVIEW_SIDE : PREVIEW_SIDE);
                 bitmap.close();
                 setOriginal(imageDataCanvas(data));
             })
@@ -226,7 +226,8 @@ function AppContent() {
         let cancelled = false;
         revision.current++;
         setProcessing(true);
-        Promise.all([basePixels(active, current, PREVIEW_SIDE), resolveBase(active, current)])
+        const previewSide = isMobileBrowser() ? MOBILE_PREVIEW_SIDE : PREVIEW_SIDE;
+        Promise.all([basePixels(active, current, previewSide), resolveBase(active, current)])
             .then(([pixels, base]) => {
                 if (!cancelled) {
                     setLoadedSourceKey(sourceKey);
@@ -319,7 +320,7 @@ function AppContent() {
             : '';
 
     useEffect(() => {
-        if (pencilWarmupStarted.current || !source || !pencilSketchClient.current) return;
+        if (isMobileBrowser() || pencilWarmupStarted.current || !source || !pencilSketchClient.current) return;
         const timer = setTimeout(() => {
             if (pencilWarmupStarted.current || !pencilSketchClient.current) return;
             pencilWarmupStarted.current = true;
@@ -460,7 +461,7 @@ function AppContent() {
                     setNotice(t.previewFailed(e instanceof Error ? e.message : t.unknownError));
                 }
             }
-        }, 70);
+        }, isMobileBrowser() ? 140 : 70);
         return () => clearTimeout(timer);
     }, [
         source,

@@ -39,6 +39,15 @@ const COMPARE_GAP = 12;
 const DOUBLE_TAP_ZOOM = 2.2;
 type StageViewMode = 'effect' | 'split' | 'sideBySide';
 
+function drawComposedToCanvas(target: HTMLCanvasElement, composed: HTMLCanvasElement) {
+    if (target.width !== composed.width) target.width = composed.width;
+    if (target.height !== composed.height) target.height = composed.height;
+    const ctx = target.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, target.width, target.height);
+    ctx.drawImage(composed, 0, 0);
+}
+
 export function CanvasStage({
     heading,
     resultKey,
@@ -125,17 +134,28 @@ export function CanvasStage({
     const paneMaxWidth = sideBySide ? Math.max(0, (available.width - COMPARE_GAP) / 2) : available.width;
     const previewWidth = Math.min(paneMaxWidth, (available.height * layout.width) / layout.height);
 
+    const beforeVisible = sideBySide || originalVisible || comparing;
+
     useEffect(() => {
-        if (!original || !before.current || !after.current) return;
-        for (const [target, photo] of [
-            [before.current, original],
-            [after.current, processed ?? original],
-        ] as const) {
-            const composed = composeFrame(photo, width, height, frameEnabled, content);
-            target.width = composed.width;
-            target.height = composed.height;
-            target.getContext('2d')?.drawImage(composed, 0, 0);
-        }
+        if (!original || !before.current || !beforeVisible) return;
+        const composed = composeFrame(original, width, height, frameEnabled, content);
+        drawComposedToCanvas(before.current, composed);
+    }, [
+        original,
+        width,
+        height,
+        frameEnabled,
+        content.frameStyleId,
+        content.captionId,
+        content.showExif,
+        content.exif,
+        beforeVisible,
+    ]);
+
+    useEffect(() => {
+        if (!original || !after.current) return;
+        const composed = composeFrame(processed ?? original, width, height, frameEnabled, content);
+        drawComposedToCanvas(after.current, composed);
     }, [
         original,
         processed,
@@ -146,7 +166,6 @@ export function CanvasStage({
         content.captionId,
         content.showExif,
         content.exif,
-        view,
     ]);
 
     const left = (layout.x / layout.width) * 100;

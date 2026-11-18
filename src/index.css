@@ -645,6 +645,11 @@ button:not(:disabled):active { transform: scale(.97); }
 @media (max-width: 380px) {
   .topbar { padding-left: 14px; padding-right: 14px; }.brand small { letter-spacing: 0; }.top-import { padding: 0 10px; }.style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.style-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.empty-stage h1 { font-size: 33px; }.empty-stage p { font-size: 11px; }.stage-view-btn { padding: 8px 10px; }
 }
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  :root { --glass: var(--glass-solid); --glass-strong: var(--glass-solid); }
+  .app::after { filter: none; background: radial-gradient(closest-side, var(--glass), transparent); }
+  .tabs, .controls, .stage-view-btn, .stage-zoom-controls, .toast, .modal, .drop-overlay, .top-import, .top-settings-btn, .settings-popover, .work-badge, .art-float, .modal-backdrop, .stage-corner, .stage-processing, .compare-handle { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }

@@ -1,6 +1,7 @@
 export const MAX_PIXELS = 24000000;
 export const MAX_SIDE = 12000;
 export const PREVIEW_SIDE = 1600;
+export const MOBILE_PREVIEW_SIDE = 960;
 export const EXPORT_TILE = 768;
 export const EXPORT_HALO = 96;
 export const WATERCOLOR_STYLE_SIDE = 768;
