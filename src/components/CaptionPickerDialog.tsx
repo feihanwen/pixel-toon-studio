@@ -7,6 +7,7 @@ import {
     captionThemeLabel,
     customCaptionId,
     customCaptionValue,
+    dialogRandomCandidates,
     filterCaptions,
     isCustomCaptionId,
     normalizeCustomCaption,
@@ -152,7 +153,10 @@ export function CaptionPickerDialog({ selectedId, onPreview, onConfirm, onCancel
                 <div className="caption-dialog-footer">
                     <div className="caption-selected">{t.captionCurrentPreview(captionText(selectedId))}</div>
                     <div>
-                        <button className="caption-random" onClick={() => selectPreset(onRandom(options, selectedId))}>
+                        <button
+                            className="caption-random"
+                            onClick={() => selectPreset(onRandom(dialogRandomCandidates(options, appLang, language), selectedId))}
+                        >
                             {t.randomCaptionBtn}
                         </button>
                         <button onClick={onCancel}>{t.cancelBtn}</button>

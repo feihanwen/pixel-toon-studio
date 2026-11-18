@@ -26,7 +26,7 @@
 
 ![Pixel & Toon Studio editor interface: real-time split view comparison between coastal town original photo and watercolor effect](docs/showcase/editor.jpg)
 
-**Pixel & Toon Studio** is a private, on-device creative photo studio for desktop and web. Turn everyday snapshots into Cel Shaded Anime, 2D Pixel Line Art, Watercolor & Impasto, Pop Art Halftone, Manga Screentone, AI-assisted Colored Pencil Sketch, Duotone Posters, or Vintage 35mm Film. Complete your creation with **Smart Mosaic Brush (AI Face Contour Fit)**, **Smart Color v2**, **4 on-device AI super-resolution & denoise models**, **27 themed Polaroid frames**, **48 bilingual captions**, custom text, or camera EXIF specs — ready for single or selective batch export as high-resolution **PNG / JPEG** keepsake cards.
+**Pixel & Toon Studio** is a private, on-device creative photo studio for desktop and web. Turn everyday snapshots into Cel Shaded Anime, 2D Pixel Line Art, Watercolor & Impasto, Pop Art Halftone, Manga Screentone, AI-assisted Colored Pencil Sketch, Duotone Posters, or Vintage 35mm Film. Complete your creation with **Smart Mosaic Brush (AI Face Contour Fit)**, **Smart Color v2**, **4 on-device AI super-resolution & denoise models**, **27 themed Polaroid frames**, **200 bilingual captions (100 Chinese + 100 English)**, custom text, or camera EXIF specs — ready for single or selective batch export as high-resolution **PNG / JPEG** keepsake cards.
 
 All image decoding, canvas shader pipelines, and 6 bundled ONNX neural networks execute locally on your device. **No accounts, no API keys, and zero photo uploads.** Your photos never leave your computer.
 
@@ -39,7 +39,7 @@ All image decoding, canvas shader pipelines, and 6 bundled ONNX neural networks 
 - 🧠 **4 On-Device AI Super-Resolution & Denoise Models**: Powered by ONNX Runtime Web with **WebGPU hardware acceleration** and **CPU/WASM SIMD fallback** (switchable in More Settings). Includes LiveAction (`×2`), OmniSR (`×2`), RealESR-Anime (`×2`), and NAFNet (`1×` denoise), plus **4 Texture Presets** (Balanced, Crisp Lines, Soft Focus, Clean Denoise) and **4 post-processing sliders** (Blend Strength, Adaptive USM Sharpen, Local Clarity, Edge Denoise).
 - 🪄 **Smart Color v2 & 6-Channel Light Adjustments**: Deterministic histogram & neutral-gray white balance optimizer with live diagnostic badges (*Shadows Lifted*, *Highlights Tamed*, *Contrast Boosted*, *Warmed Tone*, *Cast Corrected*), main strength slider, and 4 fine-tuning offsets (Exposure, Tone Contrast, Temperature, Vibrance) — paired with 6 global sliders (Brightness, Contrast, Saturation, Highlights, Shadows, Temperature).
 - 🖼 **27 Themed Instant Polaroid Frames**: Spanning 6 curated categories (Solid Classic, Dreamy Gradient, Retro Pattern, Anime & Pop, Paper & Texture, Collage & DIY), dynamically rendered on Canvas to fit your photo's native aspect ratio with one-click shuffle.
-- ✍️ **48 Bilingual Captions, Custom Text & Camera EXIF**: Filterable by language and 8 themes, plus custom text notes (up to 48 characters) and privacy-consented camera EXIF readout (model, shutter speed, aperture, ISO, and capture date).
+- ✍️ **200 Bilingual Captions, Custom Text & Camera EXIF**: 100 Chinese and 100 English captions across 10 themes (including rich emotional & healing lines), filterable by language and theme (randomization uses both languages in Chinese UI mode and English-only in English UI mode unless you manually pick/filter Chinese), plus custom text notes (up to 48 characters) and privacy-consented camera EXIF readout (model, shutter speed, aperture, ISO, and capture date).
 - 📑 **Multi-Tab Workspace & Selective Batch Export**: Edit multiple photos in parallel tabs with independent undo/redo history; open *Select & Export* in the sidebar to check photos (with Select All, clicking any photo switches the left canvas preview) and export as **PNG (Lossless)** or **JPEG (Compact)**.
 - ⚡ **Multi-Threaded Tiled HD Export & Cross-Device Saving**: Web Worker 768 px tiled rendering with dynamic style/mosaic halo padding exports up to **24 MP / 12,000 px** seamless PNG or JPEG files while stripping sensitive GPS & EXIF metadata; supports picking save files/folders directly on Desktop and Chromium browsers, and saving straight to Phone Photos via native OS share sheet or long-press preview modal on mobile browsers.
 - 🌐 **Full Bilingual UI & 6 Glassmorphic Theme Palettes**: First-launch language onboarding and Preferences popover for instant live switching between **English / 简体中文** (across all styles, sliders, frames, captions, and native desktop menus), **System / Light / Dark** appearance, and 6 theme colors (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
@@ -195,9 +195,9 @@ Organized into 6 categories with a visual picker, category filter, and random sh
 - **Paper & Texture (4)**: #20 Kraft Paper, #21 Brushed Silver, #22 35mm Film Strip, #23 Crumpled Washi Paper.
 - **Collage & DIY (4)**: #24 Washi Tape, #25 Airmail Postcard, #26 Gothic Thorn, #27 Double Mat Border.
 
-### 2. 48 Bilingual Captions & Custom Typography
+### 2. 200 Bilingual Captions & Custom Typography
 
-- **48 Curated Captions**: Spanning 8 themes (*Daily Moments*, *Getaway*, *City Walk*, *Into Nature*, *With Friends*, *Sweet Time*, *Photo Dump*, *Minimal*), filterable by language and theme.
+- **200 Curated Captions (100 ZH + 100 EN)**: Spanning 10 themes (*Daily Moments*, *Getaway*, *City Walk*, *Into Nature*, *With Friends*, *Sweet Time*, *Photo Dump*, *Minimal*, *Mood & Feels*, *Soft & Healing*), filterable by language and theme. Randomization picks from both Chinese and English in Chinese UI mode, and from English only in English UI mode unless you manually select or filter for Chinese captions.
 - **Custom Note Input**: Type custom places, dates, or notes (up to 48 characters) directly in the picker dialog.
 
 ### 3. Native Camera EXIF Readout

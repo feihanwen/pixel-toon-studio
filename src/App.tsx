@@ -4,7 +4,7 @@ import { AutoColorPanel } from './components/AutoColorPanel';
 import { StudioIcon } from './components/StudioIcon';
 import { SettingsPanel } from './components/SettingsPanel';
 import { GLOBAL, styleParams, styleShortName } from './config/styles';
-import { CAPTIONS, pickRandomCaption, type Caption } from './config/captions';
+import { pickRandomCaption, randomCaptionPool, type Caption } from './config/captions';
 import {
     DEFAULT_FRAME_STYLE_ID,
     FRAME_STYLES,
@@ -1426,7 +1426,7 @@ function AppContent() {
                     onOpenFrameStyle={openFrameStylePicker}
                     onExif={exif}
                     onCaption={() => {
-                        const id = pickCaption(CAPTIONS, current?.captionId ?? '');
+                        const id = pickCaption(randomCaptionPool(language), current?.captionId ?? '');
                         commitEdit(s => ({ ...s, captionId: id }));
                     }}
                     onOpenCaption={openCaptionPicker}
