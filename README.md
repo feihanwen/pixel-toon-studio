@@ -5,7 +5,7 @@
   <p><strong>让每一张日常照片，都变成动漫分镜、手绘艺术或怀旧明信片。</strong></p>
   <p>纯本地端离线运行 · 零配置 · 零上传 · 保护隐私 · 无需 API Key</p>
   <p>
-    <a href="https://pixelstudio-y.vercel.app/"><strong>🌐 在线体验 Web Demo (pixelstudio-y.vercel.app)</strong></a>
+    <a href="https://pixelstudio-g.vercel.app/"><strong>🌐 在线体验 Web Demo (pixelstudio-y.vercel.app)</strong></a>
   </p>
   <p>
     <a href="#核心功能一览">核心功能</a>
