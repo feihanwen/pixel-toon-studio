@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { APP_URL, createAssetHandler, isAppUrl, pngPayload } from './local-assets.mjs';
+import { APP_URL, createAssetHandler, imagePayload, isAppUrl } from './local-assets.mjs';
 import { OpenImageQueue, imageArguments } from './open-images.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +34,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'pixel-toon', privileges: {
 } }]);
 
 let mainWindow, quitting = false, saveDialogOpen = false;
+let activeExportDir = null;
 let creatingWindow;
 let desktopReady = false;
 const openImages = new OpenImageQueue();
@@ -130,23 +131,67 @@ ipcMain.on('desktop:close-ready', (event, token, error) => {
     pending.win.close();
 });
 
-ipcMain.handle('desktop:save-png', async (event, bytes, name) => {
+async function handleSaveImage(event, bytes, name, format = 'png') {
     const en = currentPrefs.language === 'en';
     if (!trustedSender(event)) throw new Error(en ? 'Invalid save request' : '无效的保存请求');
     if (saveDialogOpen) throw new Error(en ? 'Please complete the current save first' : '请先完成当前图片的保存');
-    const { data, filename } = pngPayload(bytes, name);
+    const resolvedFormat = format === 'jpeg' ? 'jpeg' : 'png';
+    const { data, filename } = imagePayload(bytes, name, resolvedFormat);
     saveDialogOpen = true;
     try {
         const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-            title: en ? 'Save PNG Image' : '保存 PNG 图片',
+            title: en
+                ? (resolvedFormat === 'jpeg' ? 'Save JPEG Image' : 'Save PNG Image')
+                : (resolvedFormat === 'jpeg' ? '保存 JPEG 图片' : '保存 PNG 图片'),
             defaultPath: join(app.getPath('downloads'), filename),
-            filters: [{ name: en ? 'PNG Image' : 'PNG 图片', extensions: ['png'] }],
+            filters: [
+                resolvedFormat === 'jpeg'
+                    ? { name: en ? 'JPEG Image' : 'JPEG 图片', extensions: ['jpg', 'jpeg'] }
+                    : { name: en ? 'PNG Image' : 'PNG 图片', extensions: ['png'] },
+            ],
             properties: ['createDirectory', 'showOverwriteConfirmation'],
         });
         if (canceled || !filePath) return false;
         await writeFile(filePath, data);
         return true;
     } finally { saveDialogOpen = false; }
+}
+
+ipcMain.handle('desktop:save-png', (event, bytes, name) => handleSaveImage(event, bytes, name, 'png'));
+ipcMain.handle('desktop:save-image', (event, bytes, name, format) => handleSaveImage(event, bytes, name, format));
+
+ipcMain.handle('desktop:pick-export-dir', async event => {
+    const en = currentPrefs.language === 'en';
+    if (!trustedSender(event)) throw new Error(en ? 'Invalid export request' : '无效的导出请求');
+    if (saveDialogOpen) throw new Error(en ? 'Please complete the current save first' : '请先完成当前图片的保存');
+    saveDialogOpen = true;
+    try {
+        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            title: en ? 'Choose Export Folder' : '选择批量导出文件夹',
+            defaultPath: app.getPath('downloads'),
+            properties: ['openDirectory', 'createDirectory'],
+        });
+        if (canceled || !filePaths.length) {
+            activeExportDir = null;
+            return false;
+        }
+        activeExportDir = filePaths[0];
+        return true;
+    } finally { saveDialogOpen = false; }
+});
+
+ipcMain.handle('desktop:save-batch-image', async (event, bytes, name, format = 'png') => {
+    const en = currentPrefs.language === 'en';
+    if (!trustedSender(event) || !activeExportDir) throw new Error(en ? 'No export folder selected' : '未选择导出文件夹');
+    const resolvedFormat = format === 'jpeg' ? 'jpeg' : 'png';
+    const { data, filename } = imagePayload(bytes, name, resolvedFormat);
+    await writeFile(join(activeExportDir, filename), data);
+    return true;
+});
+
+ipcMain.handle('desktop:end-batch-export', event => {
+    if (!trustedSender(event)) return;
+    activeExportDir = null;
 });
 
 function showAboutDialog() {

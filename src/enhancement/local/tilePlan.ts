@@ -1,6 +1,8 @@
+import { currentMsg } from '../../config/errors';
+
 export interface Tile { x: number; y: number; width: number; height: number }
 export function tilePlan(width: number, height: number, tileSize = 128): Tile[] {
-    if (![width, height, tileSize].every(v => Number.isInteger(v) && v > 0)) throw new Error('无效的分块尺寸');
+    if (![width, height, tileSize].every(v => Number.isInteger(v) && v > 0)) throw new Error(currentMsg('无效的分块尺寸', 'Invalid tile dimensions'));
     const tiles: Tile[] = [];
     for (let y = 0; y < height; y += tileSize) for (let x = 0; x < width; x += tileSize)
         tiles.push({ x, y, width: Math.min(tileSize, width - x), height: Math.min(tileSize, height - y) });

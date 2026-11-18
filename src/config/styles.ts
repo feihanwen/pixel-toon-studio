@@ -172,3 +172,192 @@ export function styleParams(styleId: StyleId): Record<string, ParamDefinition> {
 export function styleShortName(styleId: StyleId, lang: AppLanguage = 'zh'): string {
     return lang === 'en' ? STYLES[styleId].shortEn : STYLES[styleId].short;
 }
+
+export const CORE_PARAM_KEYS: Record<StyleId, readonly [string, string, string]> = {
+    cel: ['levels', 'ink', 'colorPop'],
+    pixel: ['size', 'colors', 'edgeSharpness'],
+    watercolor: ['radius', 'smear', 'vibrance'],
+    halftone: ['dot', 'density', 'ink'],
+    manga: ['ink', 'dot', 'contrast'],
+    pencil: ['line', 'pigment', 'stroke'],
+    duotone: ['shadowHue', 'highlightHue', 'split'],
+    film: ['fade', 'grain', 'warmth'],
+};
+
+export interface StylePreset {
+    id: string;
+    label: string;
+    labelEn: string;
+    params: Record<string, number>;
+}
+
+export const STYLE_PRESETS: Record<StyleId, readonly [StylePreset, StylePreset, StylePreset]> = {
+    cel: [
+        {
+            id: 'cel-classic',
+            label: '经典赛璐璐',
+            labelEn: 'Classic Cel',
+            params: { levels: 5, ink: 65, sensitivity: 48, background: 70, blend: 75, colorPop: 0 },
+        },
+        {
+            id: 'cel-bright',
+            label: '清透新海',
+            labelEn: 'Bright Anime',
+            params: { levels: 7, ink: 42, sensitivity: 42, background: 82, blend: 85, colorPop: 42 },
+        },
+        {
+            id: 'cel-ova',
+            label: '浓郁复古',
+            labelEn: 'Bold OVA',
+            params: { levels: 4, ink: 88, sensitivity: 62, background: 55, blend: 62, colorPop: 25 },
+        },
+    ],
+    pixel: [
+        {
+            id: 'pixel-crisp',
+            label: '精致像素',
+            labelEn: 'Crisp Pixel',
+            params: { size: 3, edgeSharpness: 80, cleanup: 45, colors: 12, dominant: 70, contrast: 12 },
+        },
+        {
+            id: 'pixel-retro',
+            label: '8-bit 复古',
+            labelEn: 'Retro 8-bit',
+            params: { size: 7, edgeSharpness: 90, cleanup: 65, colors: 6, dominant: 85, contrast: 35 },
+        },
+        {
+            id: 'pixel-soft',
+            label: '柔和物语',
+            labelEn: 'Soft Story',
+            params: { size: 4, edgeSharpness: 45, cleanup: 35, colors: 18, dominant: 50, contrast: 5 },
+        },
+    ],
+    watercolor: [
+        {
+            id: 'watercolor-wet',
+            label: '湿画晕染',
+            labelEn: 'Wet Wash',
+            params: { radius: 7, smear: 78, softness: 62, detail: 55, vibrance: 13, warmth: 28 },
+        },
+        {
+            id: 'watercolor-pastel',
+            label: '清新淡彩',
+            labelEn: 'Light Pastel',
+            params: { radius: 5, smear: 55, softness: 75, detail: 72, vibrance: -10, warmth: 10 },
+        },
+        {
+            id: 'watercolor-impasto',
+            label: '厚涂油画',
+            labelEn: 'Rich Impasto',
+            params: { radius: 12, smear: 92, softness: 40, detail: 38, vibrance: 45, warmth: 38 },
+        },
+    ],
+    halftone: [
+        {
+            id: 'halftone-classic',
+            label: '黄金美漫',
+            labelEn: 'Classic Pop',
+            params: { dot: 6, density: 45, ink: 55, shift: 0, poster: 90, levels: 5 },
+        },
+        {
+            id: 'halftone-misprint',
+            label: '错版海报',
+            labelEn: 'Misprint',
+            params: { dot: 8, density: 68, ink: 72, shift: 7, poster: 95, levels: 4 },
+        },
+        {
+            id: 'halftone-light',
+            label: '轻网点印刷',
+            labelEn: 'Light Print',
+            params: { dot: 4, density: 28, ink: 35, shift: 2, poster: 65, levels: 7 },
+        },
+    ],
+    manga: [
+        {
+            id: 'manga-weekly',
+            label: '连载原稿',
+            labelEn: 'Weekly Ink',
+            params: { dot: 6, ink: 76, levels: 4, white: 72, contrast: 0, hatch: 65 },
+        },
+        {
+            id: 'manga-shonen',
+            label: '热血强对比',
+            labelEn: 'High Contrast',
+            params: { dot: 5, ink: 92, levels: 3, white: 82, contrast: 42, hatch: 85 },
+        },
+        {
+            id: 'manga-seinen',
+            label: '细腻网点',
+            labelEn: 'Fine Tone',
+            params: { dot: 3, ink: 58, levels: 7, white: 60, contrast: -10, hatch: 45 },
+        },
+    ],
+    pencil: [
+        {
+            id: 'pencil-warm',
+            label: '暖纸彩铅',
+            labelEn: 'Warm Sketch',
+            params: { stroke: 3, line: 62, pigment: 68, paper: 24, hatch: 36, warmPaper: 40 },
+        },
+        {
+            id: 'pencil-inked',
+            label: '素描重线',
+            labelEn: 'Inked Sketch',
+            params: { stroke: 2, line: 88, pigment: 30, paper: 38, hatch: 68, warmPaper: 12 },
+        },
+        {
+            id: 'pencil-storybook',
+            label: '柔彩绘本',
+            labelEn: 'Storybook',
+            params: { stroke: 5, line: 42, pigment: 88, paper: 18, hatch: 22, warmPaper: 55 },
+        },
+    ],
+    duotone: [
+        {
+            id: 'duotone-sunset',
+            label: '靛蓝暖橙',
+            labelEn: 'Indigo Sunset',
+            params: { shadowHue: 225, highlightHue: 35, split: 52, detail: 42, saturation: 75, contrast: 15 },
+        },
+        {
+            id: 'duotone-cyber',
+            label: '赛博粉青',
+            labelEn: 'Neon Cyber',
+            params: { shadowHue: 270, highlightHue: 175, split: 48, detail: 55, saturation: 92, contrast: 32 },
+        },
+        {
+            id: 'duotone-emerald',
+            label: '墨绿米金',
+            labelEn: 'Vintage Gold',
+            params: { shadowHue: 155, highlightHue: 45, split: 56, detail: 48, saturation: 62, contrast: 18 },
+        },
+    ],
+    film: [
+        {
+            id: 'film-kodak',
+            label: '暖调柯达',
+            labelEn: 'Kodak Warm',
+            params: { fade: 48, grain: 64, smear: 45, warmth: 24, halation: 38, tint: 0, vignette: 0 },
+        },
+        {
+            id: 'film-fuji',
+            label: '日系清冷',
+            labelEn: 'Fuji Cool',
+            params: { fade: 62, grain: 42, smear: 35, warmth: -22, halation: 24, tint: -18, vignette: 15 },
+        },
+        {
+            id: 'film-cinestill',
+            label: '暗夜光晕',
+            labelEn: 'Night Halation',
+            params: { fade: 35, grain: 78, smear: 52, warmth: 12, halation: 82, tint: 16, vignette: 45 },
+        },
+    ],
+};
+
+export function matchingStylePresetId(styleId: StyleId, current: Record<string, number>): string | null {
+    for (const preset of STYLE_PRESETS[styleId]) {
+        const matches = Object.entries(preset.params).every(([k, v]) => current[k] === v);
+        if (matches) return preset.id;
+    }
+    return null;
+}

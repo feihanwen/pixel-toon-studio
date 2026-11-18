@@ -9,6 +9,10 @@ contextBridge.exposeInMainWorld('pixelToonDesktop', {
         return () => ipcRenderer.removeListener('desktop:images-available', handler);
     },
     savePng: (bytes, name) => ipcRenderer.invoke('desktop:save-png', bytes, name),
+    saveImage: (bytes, name, format) => ipcRenderer.invoke('desktop:save-image', bytes, name, format),
+    pickExportDir: () => ipcRenderer.invoke('desktop:pick-export-dir'),
+    saveBatchImage: (bytes, name, format) => ipcRenderer.invoke('desktop:save-batch-image', bytes, name, format),
+    endBatchExport: () => ipcRenderer.invoke('desktop:end-batch-export'),
     onCommand: listener => {
         const handler = (_event, command) => listener(command);
         ipcRenderer.on('desktop:command', handler);

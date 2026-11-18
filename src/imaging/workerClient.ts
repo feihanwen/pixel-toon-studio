@@ -1,3 +1,5 @@
+import { currentMsg } from '../config/errors';
+import { getLanguage } from '../config/preferences';
 import type { RenderRequest, WorkerResponse } from '../types/worker';
 
 let nextId = 1;
@@ -23,7 +25,7 @@ export class WorkerClient {
             }
         };
         this.worker.onerror = event => {
-            const error = new Error(event.message || 'Worker 运行失败');
+            const error = new Error(event.message || currentMsg('Worker 运行失败', 'Render worker failed'));
             this.active?.reject(error);
             this.queued?.reject(error);
             this.active = null;
@@ -45,7 +47,7 @@ export class WorkerClient {
     }
 
     render(input: Omit<RenderRequest, 'kind' | 'id'>) {
-        const request: RenderRequest = { ...input, kind: 'render', id: nextId++ };
+        const request: RenderRequest = { ...input, kind: 'render', id: nextId++, language: input.language ?? getLanguage() };
         return new Promise<WorkerResponse>((resolve, reject) => {
             const job = { request, resolve, reject };
             if (!this.active) {
@@ -57,7 +59,7 @@ export class WorkerClient {
                         id: this.queued.request.id,
                         tabId: this.queued.request.tabId,
                         revision: this.queued.request.revision,
-                        message: '已被更新的预览替代',
+                        message: currentMsg('已被更新的预览替代', 'Superseded by a newer preview'),
                     });
                 }
                 this.queued = job;
@@ -69,7 +71,7 @@ export class WorkerClient {
 
     dispose() {
         this.worker.terminate();
-        const error = new Error('处理已取消');
+        const error = new Error(currentMsg('处理已取消', 'Processing cancelled'));
         this.active?.reject(error);
         this.queued?.reject(error);
         this.active = null;

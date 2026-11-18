@@ -1,3 +1,4 @@
+import { currentMsg } from '../config/errors';
 import { analyzeAutoColor } from '../imaging/autoColor';
 import { decode, toImageData, imageDataCanvas } from '../imaging/decode';
 import { getResult } from '../storage/enhancementStore';
@@ -6,13 +7,19 @@ import { enhancementClarity, enhancementDenoise, enhancementSharpen } from '../t
 import { applyAdaptiveUsm, applyEdgeDenoise, applyLocalClarity } from './usm';
 
 export function canvasBlob(canvas: HTMLCanvasElement, type = 'image/png', quality?: number) {
-    return new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片编码失败，可能是内存不足')), type, quality));
+    return new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+            blob => (blob ? resolve(blob) : reject(new Error(currentMsg('图片编码失败，可能是内存不足', 'Image encoding failed, possibly due to low memory')))),
+            type,
+            quality,
+        ),
+    );
 }
 export async function resolveBase(tab: PhotoTab, state: EditorSnapshot) {
     const selection = state.enhancement;
     if (!selection?.enabled || !selection.resultId || selection.strength === 0) return { blob: tab.blob, width: tab.width, height: tab.height };
     const result = await getResult(selection.resultId);
-    if (!result) throw new Error('增强缓存已被清理，请关闭增强使用原图，或手动重新生成');
+    if (!result) throw new Error(currentMsg('增强缓存已被清理，请关闭增强使用原图，或手动重新生成', 'Enhanced cache was cleared; disable enhancement or regenerate'));
     return { blob: result.blob, width: result.width, height: result.height };
 }
 // Shared by preview and full-resolution export. Strength, USM sharpen, clarity and denoise never start a model task.

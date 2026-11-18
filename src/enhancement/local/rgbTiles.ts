@@ -1,7 +1,10 @@
+import { currentMsg } from '../../config/errors';
 import { reflect, type Tile } from './tilePlan';
 
 export function rgbTilePlan(width: number, height: number, side: number, blend: number): Tile[] {
-    if (![width, height, side].every(n => Number.isInteger(n) && n > 0) || !Number.isInteger(blend) || blend < 0 || side <= blend * 2) throw new Error('无效的 RGB 分块尺寸');
+    if (![width, height, side].every(n => Number.isInteger(n) && n > 0) || !Number.isInteger(blend) || blend < 0 || side <= blend * 2) {
+        throw new Error(currentMsg('无效的 RGB 分块尺寸', 'Invalid RGB tile dimensions'));
+    }
     const tiles: Tile[] = [], stride = side - blend * 2;
     for (let y = 0; y < height; y += stride) for (let x = 0; x < width; x += stride)
         tiles.push({ x, y, width: Math.min(side, width - x), height: Math.min(side, height - y) });
@@ -24,7 +27,7 @@ function feather(position: number, length: number, ramp: number, low: boolean, h
 export function accumulateTile(sums: Float32Array, weights: Float32Array, data: Float32Array,
     width: number, height: number, tile: Tile, halo: number, scale: number, blend: number) {
     const iw = (tile.width + halo * 2) * scale, ih = (tile.height + halo * 2) * scale, plane = iw * ih;
-    if (data.length !== plane * 3) throw new Error('模型输出尺寸异常');
+    if (data.length !== plane * 3) throw new Error(currentMsg('模型输出尺寸异常', 'Unexpected model output dimensions'));
     const tw = tile.width * scale, th = tile.height * scale, ow = width * scale;
     for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
         const weight = feather(x, tw, blend * scale * 2, tile.x > 0, tile.x + tile.width < width)
@@ -33,7 +36,7 @@ export function accumulateTile(sums: Float32Array, weights: Float32Array, data: 
         const dst = (tile.y * scale + y) * ow + tile.x * scale + x;
         for (let c = 0; c < 3; c++) {
             const value = data[c * plane + src];
-            if (!Number.isFinite(value)) throw new Error('模型输出包含无效像素');
+            if (!Number.isFinite(value)) throw new Error(currentMsg('模型输出包含无效像素', 'Model output contains invalid pixel values'));
             sums[dst * 3 + c] += value * weight;
         }
         weights[dst] += weight;
@@ -48,7 +51,7 @@ function cubic(x: number) {
 export function finishRgb(sums: Float32Array, weights: Float32Array, rgba: Uint8ClampedArray, width: number, height: number, nativeScale: number) {
     const iw = width * nativeScale, ih = height * nativeScale, ow = width * 2, oh = height * 2;
     for (let i = 0; i < weights.length; i++) {
-        if (!(weights[i] > 0)) throw new Error('分块输出有未覆盖像素');
+        if (!(weights[i] > 0)) throw new Error(currentMsg('分块输出有未覆盖像素', 'Tiled output has uncovered pixels'));
         for (let c = 0; c < 3; c++) sums[i * 3 + c] /= weights[i];
     }
     const output = new Uint8ClampedArray(ow * oh * 4), ratio = nativeScale / 2, support = Math.max(1, ratio);

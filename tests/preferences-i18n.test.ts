@@ -11,7 +11,17 @@ import {
     getLanguage,
 } from '../src/config/preferences';
 import { ENHANCEMENT_CHOICES, UI_STRINGS, uiText } from '../src/config/i18n';
-import { GLOBAL, STYLES, styleShortName } from '../src/config/styles';
+import {
+    CORE_PARAM_KEYS,
+    GLOBAL,
+    STYLES,
+    STYLE_PRESETS,
+    matchingStylePresetId,
+    styleShortName,
+    type StyleId,
+} from '../src/config/styles';
+import { bMsg, currentMsg } from '../src/config/errors';
+import { exportFilename } from '../src/imaging/export';
 import {
     FRAME_CATEGORIES,
     FRAME_STYLES,
@@ -107,5 +117,34 @@ describe('bilingual i18n and theme color preferences', () => {
         expect(frameKind({ captionId: 'c1', showExif: false, exif: null })).toBe('Caption');
         setGlobalLanguage('zh');
         expect(frameKind({ captionId: 'c1', showExif: false, exif: null })).toBe('文案');
+    });
+
+    it('provides 3 valid presets and 3 core parameter keys for every style, plus bilingual errors and export formats', () => {
+        for (const id of Object.keys(STYLES) as StyleId[]) {
+            const paramKeys = Object.keys(STYLES[id].params);
+            const coreKeys = CORE_PARAM_KEYS[id];
+            expect(coreKeys).toHaveLength(3);
+            for (const k of coreKeys) {
+                expect(paramKeys).toContain(k);
+            }
+            const presets = STYLE_PRESETS[id];
+            expect(presets).toHaveLength(3);
+            for (const preset of presets) {
+                expect(preset.label.length).toBeGreaterThan(0);
+                expect(preset.labelEn.length).toBeGreaterThan(0);
+                expect(Object.keys(preset.params).sort()).toEqual([...paramKeys].sort());
+                expect(matchingStylePresetId(id, preset.params)).toBe(preset.id);
+            }
+        }
+
+        expect(exportFilename('sample.heic', 'cel', true, 'png')).toMatch(/-enhanced-pixel-toon-.*\.png$/);
+        expect(exportFilename('sample.heic', 'cel', false, 'jpeg')).toMatch(/-pixel-toon-.*\.jpg$/);
+
+        expect(bMsg('zh', '中文错误', 'English error')).toBe('中文错误');
+        expect(bMsg('en', '中文错误', 'English error')).toBe('English error');
+        setGlobalLanguage('en');
+        expect(currentMsg('中文错误', 'English error')).toBe('English error');
+        setGlobalLanguage('zh');
+        expect(currentMsg('中文错误', 'English error')).toBe('中文错误');
     });
 });

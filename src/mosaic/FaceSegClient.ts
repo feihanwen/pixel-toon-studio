@@ -1,3 +1,5 @@
+import { currentMsg } from '../config/errors';
+import { getLanguage } from '../config/preferences';
 import type { MosaicStroke } from '../types/mosaic';
 
 export interface FaceMaskResult {
@@ -41,7 +43,7 @@ export class FaceSegClient {
             }
         };
         this.worker.onerror = event => {
-            const err = new Error(event.message || '人脸识别 Worker 启动失败');
+            const err = new Error(event.message || currentMsg('人脸识别 Worker 启动失败', 'Face segmentation worker failed to start'));
             for (const job of this.pending.values()) job.reject(err);
             this.pending.clear();
         };
@@ -67,6 +69,7 @@ export class FaceSegClient {
                     strokes,
                     aiFaceFit,
                     baseUrl: typeof document !== 'undefined' ? document.baseURI : self.location.href,
+                    language: getLanguage(),
                 },
                 [copy.buffer],
             );
@@ -75,7 +78,7 @@ export class FaceSegClient {
 
     dispose() {
         this.worker.terminate();
-        const err = new Error('人脸识别已取消');
+        const err = new Error(currentMsg('人脸识别已取消', 'Face segmentation cancelled'));
         for (const job of this.pending.values()) job.reject(err);
         this.pending.clear();
     }

@@ -1,6 +1,8 @@
 import type { InferenceSession } from 'onnxruntime-web';
 import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
 import gpuWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
+import { bMsg } from '../config/errors';
+import type { AppLanguage } from '../config/preferences';
 import { digest } from '../enhancement/domain';
 import { selectLocalBackend } from '../enhancement/local/backend';
 import type { LocalBackend } from '../enhancement/local/modelManifest';
@@ -14,11 +16,13 @@ type PencilWorkerRequest =
           height: number;
           buffer: ArrayBuffer;
           baseUrl: string;
+          language?: AppLanguage;
       }
     | {
           kind: 'warmup';
           id: number;
           baseUrl: string;
+          language?: AppLanguage;
       };
 
 let session: InferenceSession | null = null;
@@ -28,7 +32,7 @@ let activeBackend: LocalBackend = 'wasm';
 let gpuDisabled = false;
 let runQueue: Promise<unknown> = Promise.resolve();
 
-async function cachedAsset(url: string): Promise<ArrayBuffer> {
+async function cachedAsset(url: string, language?: AppLanguage): Promise<ArrayBuffer> {
     const absolute = new URL(url, self.location.href).href;
     let cache: Cache | undefined;
     try {
@@ -39,7 +43,7 @@ async function cachedAsset(url: string): Promise<ArrayBuffer> {
         // Private browsing or sandboxed context: fall back to direct fetch
     }
     const response = await fetch(absolute);
-    if (!response.ok) throw new Error('彩铅线稿模型加载失败');
+    if (!response.ok) throw new Error(bMsg(language, '彩铅线稿模型加载失败', 'Failed to load pencil line-art model'));
     const copy = response.clone();
     try {
         await cache?.put(absolute, copy);
@@ -52,6 +56,7 @@ async function cachedAsset(url: string): Promise<ArrayBuffer> {
 async function ensureSession(
     baseUrl: string,
     skipGpu = false,
+    language?: AppLanguage,
 ): Promise<{ session: InferenceSession; backend: LocalBackend; ort: typeof import('onnxruntime-web') }> {
     if (session && loadedOrt && (!skipGpu || activeBackend === 'wasm')) {
         return { session, backend: activeBackend, ort: loadedOrt };
@@ -61,19 +66,19 @@ async function ensureSession(
     const currentPromise = (async () => {
         const modelUrl = pencilLineartModelUrl(baseUrl);
         if (new URL(modelUrl).origin !== self.location.origin) {
-            throw new Error('本地模型必须来自本站');
+            throw new Error(bMsg(language, '本地模型必须来自本站', 'On-device model must be served from same origin'));
         }
         const canUseGpu = !skipGpu && !gpuDisabled && 'gpu' in navigator;
         const ort = canUseGpu ? await import('onnxruntime-web/all') : await import('onnxruntime-web/wasm');
         const [modelBytes, wasmBytes] = await Promise.all([
-            cachedAsset(modelUrl),
-            cachedAsset(canUseGpu ? gpuWasmUrl : wasmUrl),
+            cachedAsset(modelUrl, language),
+            cachedAsset(canUseGpu ? gpuWasmUrl : wasmUrl, language),
         ]);
         if (
             modelBytes.byteLength !== PENCIL_LINEART_MODEL.bytes ||
             (await digest(modelBytes)) !== PENCIL_LINEART_MODEL.sha256
         ) {
-            throw new Error('彩铅线稿模型校验失败');
+            throw new Error(bMsg(language, '彩铅线稿模型校验失败', 'Pencil line-art model verification failed'));
         }
         ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
         ort.env.wasm.wasmBinary = wasmBytes;
@@ -164,9 +169,10 @@ async function runInference(
     ah: number,
     baseUrl: string,
     skipGpu = false,
+    language?: AppLanguage,
 ): Promise<Uint8Array> {
     const ahw = aw * ah;
-    const engine = await ensureSession(baseUrl, skipGpu);
+    const engine = await ensureSession(baseUrl, skipGpu, language);
     const tensor = new engine.ort.Tensor('float32', inputData, [1, 3, ah, aw]);
     let outputs: Awaited<ReturnType<InferenceSession['run']>> | undefined;
     try {
@@ -183,7 +189,7 @@ async function runInference(
             session = null;
             sessionPromise = null;
             gpuDisabled = true;
-            return runInference(inputData, aw, ah, baseUrl, true);
+            return runInference(inputData, aw, ah, baseUrl, true, language);
         }
         throw error;
     } finally {
@@ -201,7 +207,7 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
 self.onmessage = (event: MessageEvent<PencilWorkerRequest>) => {
     const req = event.data;
     if (req.kind === 'warmup') {
-        enqueue(() => ensureSession(req.baseUrl))
+        enqueue(() => ensureSession(req.baseUrl, false, req.language))
             .then(({ backend }) => {
                 self.postMessage({ kind: 'warmed', id: req.id, backend });
             })
@@ -209,7 +215,7 @@ self.onmessage = (event: MessageEvent<PencilWorkerRequest>) => {
                 self.postMessage({
                     kind: 'error',
                     id: req.id,
-                    message: error instanceof Error ? error.message : '彩铅线稿模型预热失败',
+                    message: error instanceof Error ? error.message : bMsg(req.language, '彩铅线稿模型预热失败', 'Pencil line-art warmup failed'),
                 });
             });
         return;
@@ -217,7 +223,7 @@ self.onmessage = (event: MessageEvent<PencilWorkerRequest>) => {
 
     const src = new Uint8ClampedArray(req.buffer);
     const { aw, ah, inputData } = prepareInput(src, req.width, req.height);
-    enqueue(() => runInference(inputData, aw, ah, req.baseUrl))
+    enqueue(() => runInference(inputData, aw, ah, req.baseUrl, false, req.language))
         .then(sketchBytes => {
             self.postMessage(
                 {
@@ -234,7 +240,7 @@ self.onmessage = (event: MessageEvent<PencilWorkerRequest>) => {
             self.postMessage({
                 kind: 'error',
                 id: req.id,
-                message: error instanceof Error ? error.message : '彩铅线稿生成失败',
+                message: error instanceof Error ? error.message : bMsg(req.language, '彩铅线稿生成失败', 'Pencil line-art generation failed'),
             });
         });
 };

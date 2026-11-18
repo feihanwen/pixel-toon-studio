@@ -1,4 +1,5 @@
 import { EXPORT_TILE, PREVIEW_SIDE } from '../config/limits';
+import { currentMsg } from '../config/errors';
 import { exportHalo } from './exportHalo';
 import { decode } from './decode';
 import { composeFrame, type FrameContent } from './frame';
@@ -10,6 +11,30 @@ import type { PhotoTab } from '../types/document';
 import { snapshot } from '../types/document';
 import { STYLES } from '../config/styles';
 import { autoColorPlan, exportBase } from '../enhancement/images';
+
+export type ExportFormat = 'png' | 'jpeg';
+export type SaveMode = 'desktop' | 'picker' | 'download' | 'cancelled';
+
+interface WritableStreamLike {
+    write(data: Blob): Promise<void>;
+    close(): Promise<void>;
+}
+
+interface FileHandleLike {
+    createWritable(): Promise<WritableStreamLike>;
+}
+
+interface DirectoryHandleLike {
+    getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandleLike>;
+}
+
+interface SavePickerWindow extends Window {
+    showSaveFilePicker?: (options?: {
+        suggestedName?: string;
+        types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+    }) => Promise<FileHandleLike>;
+    showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<DirectoryHandleLike>;
+}
 
 export interface ExportTile {
     x: number;
@@ -80,12 +105,13 @@ export async function runParallelPool<T>(
     await Promise.all(runners);
 }
 
-export async function exportPng(
+export async function exportImage(
     tab: PhotoTab,
     content: FrameContent,
     onProgress: (done: number, total: number) => void,
     precomputedMosaicMask?: { width: number; height: number; maskBuffer: ArrayBuffer } | null,
     precomputedPencilSketch?: RenderPencilSketch | null,
+    format: ExportFormat = 'png',
 ) {
     const s = snapshot(tab);
     const colorPlan = await autoColorPlan(tab, s);
@@ -153,7 +179,7 @@ export async function exportPng(
     const resultCtx = result.getContext('2d');
     if (!resultCtx) {
         bitmap.close();
-        throw new Error('无法创建导出画布');
+        throw new Error(currentMsg('无法创建导出画布', 'Could not create export canvas'));
     }
 
     const tiles = buildExportTiles(w, h, halo, EXPORT_TILE);
@@ -175,7 +201,7 @@ export async function exportPng(
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (!ctx) {
-                throw new Error('无法创建分块画布');
+                throw new Error(currentMsg('无法创建分块画布', 'Could not create tile canvas'));
             }
             slots.push({ client: new WorkerClient(), canvas, ctx });
         }
@@ -232,11 +258,36 @@ export async function exportPng(
             onProgress(done, total);
         });
 
-        const output = composeFrame(result, w, h, s.frameEnabled, content);
+        let output = composeFrame(result, w, h, s.frameEnabled, content);
+        if (format === 'jpeg' && !s.frameEnabled) {
+            const opaque = document.createElement('canvas');
+            opaque.width = output.width;
+            opaque.height = output.height;
+            const octx = opaque.getContext('2d');
+            if (octx) {
+                octx.fillStyle = '#ffffff';
+                octx.fillRect(0, 0, opaque.width, opaque.height);
+                octx.drawImage(output, 0, 0);
+                output = opaque;
+            }
+        }
+        const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const quality = format === 'jpeg' ? 0.92 : undefined;
         return await new Promise<Blob>((resolve, reject) =>
             output.toBlob(
-                blob => (blob ? resolve(blob) : reject(new Error('PNG 编码失败，可能是浏览器内存不足'))),
-                'image/png',
+                blob =>
+                    blob
+                        ? resolve(blob)
+                        : reject(
+                              new Error(
+                                  currentMsg(
+                                      `${format === 'jpeg' ? 'JPEG' : 'PNG'} 编码失败，可能是浏览器内存不足`,
+                                      `${format === 'jpeg' ? 'JPEG' : 'PNG'} encoding failed, possibly due to low memory`,
+                                  ),
+                              ),
+                          ),
+                mime,
+                quality,
             ),
         );
     } finally {
@@ -247,19 +298,32 @@ export async function exportPng(
     }
 }
 
-export function exportFilename(name: string, styleId: keyof typeof STYLES, enhanced = false) {
+export function exportPng(
+    tab: PhotoTab,
+    content: FrameContent,
+    onProgress: (done: number, total: number) => void,
+    precomputedMosaicMask?: { width: number; height: number; maskBuffer: ArrayBuffer } | null,
+    precomputedPencilSketch?: RenderPencilSketch | null,
+) {
+    return exportImage(tab, content, onProgress, precomputedMosaicMask, precomputedPencilSketch, 'png');
+}
+
+export function exportFilename(
+    name: string,
+    styleId: keyof typeof STYLES,
+    enhanced = false,
+    format: ExportFormat = 'png',
+) {
     const base =
         name
             .replace(/\.[^.]+$/, '')
             .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
             .slice(0, 100) || 'image';
-    return `${base}${enhanced ? '-enhanced' : ''}-pixel-toon-${STYLES[styleId].short}.png`;
+    const ext = format === 'jpeg' ? 'jpg' : 'png';
+    return `${base}${enhanced ? '-enhanced' : ''}-pixel-toon-${STYLES[styleId].short}.${ext}`;
 }
 
-export async function download(blob: Blob, name: string): Promise<boolean> {
-    if (window.pixelToonDesktop) {
-        return window.pixelToonDesktop.savePng(new Uint8Array(await blob.arrayBuffer()), name);
-    }
+function triggerBrowserDownload(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -268,5 +332,140 @@ export async function download(blob: Blob, name: string): Promise<boolean> {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+export async function prepareSingleSaveTarget(
+    suggestedName: string,
+    format: ExportFormat = 'png',
+): Promise<{
+    cancelled: boolean;
+    save: (blob: Blob, finalName?: string) => Promise<SaveMode>;
+}> {
+    if (window.pixelToonDesktop) {
+        return {
+            cancelled: false,
+            save: async (blob: Blob, finalName = suggestedName) => {
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+                const ok = window.pixelToonDesktop!.saveImage
+                    ? await window.pixelToonDesktop!.saveImage(bytes, finalName, format)
+                    : await window.pixelToonDesktop!.savePng(bytes, finalName);
+                return ok ? 'desktop' : 'cancelled';
+            },
+        };
+    }
+
+    const pickerWin = window as SavePickerWindow;
+    if (!navigator.webdriver && typeof pickerWin.showSaveFilePicker === 'function') {
+        try {
+            const handle = await pickerWin.showSaveFilePicker({
+                suggestedName,
+                types: [
+                    format === 'jpeg'
+                        ? { description: 'JPEG Image', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }
+                        : { description: 'PNG Image', accept: { 'image/png': ['.png'] } },
+                ],
+            });
+            return {
+                cancelled: false,
+                save: async (blob: Blob) => {
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return 'picker';
+                },
+            };
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                return { cancelled: true, save: async () => 'cancelled' };
+            }
+            // Fall through to standard browser download if picker is blocked by environment
+        }
+    }
+
+    return {
+        cancelled: false,
+        save: async (blob: Blob, finalName = suggestedName) => {
+            triggerBrowserDownload(blob, finalName);
+            return 'download';
+        },
+    };
+}
+
+export async function prepareBatchSaveTarget(): Promise<{
+    mode: 'desktop' | 'picker' | 'download';
+    save: (blob: Blob, filename: string, format: ExportFormat) => Promise<void>;
+    finish: () => Promise<void>;
+} | null> {
+    const usedNames = new Set<string>();
+    const uniqueName = (filename: string) => {
+        if (!usedNames.has(filename)) {
+            usedNames.add(filename);
+            return filename;
+        }
+        const dot = filename.lastIndexOf('.');
+        const stem = dot > 0 ? filename.slice(0, dot) : filename;
+        const ext = dot > 0 ? filename.slice(dot) : '';
+        let n = 2;
+        while (usedNames.has(`${stem}-${n}${ext}`)) n++;
+        const candidate = `${stem}-${n}${ext}`;
+        usedNames.add(candidate);
+        return candidate;
+    };
+
+    if (window.pixelToonDesktop?.pickExportDir && window.pixelToonDesktop.saveBatchImage) {
+        const picked = await window.pixelToonDesktop.pickExportDir();
+        if (!picked) return null;
+        return {
+            mode: 'desktop',
+            save: async (blob, filename, format) => {
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+                await window.pixelToonDesktop!.saveBatchImage!(bytes, uniqueName(filename), format);
+            },
+            finish: async () => {
+                await window.pixelToonDesktop?.endBatchExport?.();
+            },
+        };
+    }
+
+    const pickerWin = window as SavePickerWindow;
+    if (!navigator.webdriver && typeof pickerWin.showDirectoryPicker === 'function') {
+        try {
+            const dir = await pickerWin.showDirectoryPicker({ mode: 'readwrite' });
+            return {
+                mode: 'picker',
+                save: async (blob, filename) => {
+                    const fileHandle = await dir.getFileHandle(uniqueName(filename), { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                },
+                finish: async () => {},
+            };
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                return null;
+            }
+            // Fall through to sequential browser downloads if picker is blocked
+        }
+    }
+
+    return {
+        mode: 'download',
+        save: async (blob, filename) => {
+            triggerBrowserDownload(blob, uniqueName(filename));
+            await new Promise(resolve => setTimeout(resolve, 220));
+        },
+        finish: async () => {},
+    };
+}
+
+export async function download(blob: Blob, name: string, format: ExportFormat = 'png'): Promise<boolean> {
+    if (window.pixelToonDesktop) {
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        return window.pixelToonDesktop.saveImage
+            ? window.pixelToonDesktop.saveImage(bytes, name, format)
+            : window.pixelToonDesktop.savePng(bytes, name);
+    }
+    triggerBrowserDownload(blob, name);
     return true;
 }

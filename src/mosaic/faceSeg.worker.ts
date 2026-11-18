@@ -1,5 +1,7 @@
 import * as ort from 'onnxruntime-web/wasm';
 import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
+import { bMsg } from '../config/errors';
+import type { AppLanguage } from '../config/preferences';
 import { digest } from '../enhancement/domain';
 import type { MosaicStroke } from '../types/mosaic';
 import { buildCropFaceMask, computeFaceCropBoxes, rasterizeStrokes, refineMaskLocalEdgeAware } from './maskMath';
@@ -13,12 +15,13 @@ interface FaceMaskRequest {
     strokes: MosaicStroke[];
     aiFaceFit: boolean;
     baseUrl: string;
+    language?: AppLanguage;
 }
 
 let session: ort.InferenceSession | null = null;
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 
-async function cachedAsset(url: string): Promise<ArrayBuffer> {
+async function cachedAsset(url: string, language?: AppLanguage): Promise<ArrayBuffer> {
     const absolute = new URL(url, self.location.href).href;
     let cache: Cache | undefined;
     try {
@@ -29,7 +32,7 @@ async function cachedAsset(url: string): Promise<ArrayBuffer> {
         // Private browsing or sandboxed context: fall back to direct fetch
     }
     const response = await fetch(absolute);
-    if (!response.ok) throw new Error('人脸贴合模型加载失败');
+    if (!response.ok) throw new Error(bMsg(language, '人脸贴合模型加载失败', 'Failed to load face segmentation model'));
     const copy = response.clone();
     try {
         await cache?.put(absolute, copy);
@@ -39,18 +42,18 @@ async function cachedAsset(url: string): Promise<ArrayBuffer> {
     return response.arrayBuffer();
 }
 
-async function ensureSession(baseUrl: string): Promise<ort.InferenceSession> {
+async function ensureSession(baseUrl: string, language?: AppLanguage): Promise<ort.InferenceSession> {
     if (session) return session;
     if (sessionPromise) return sessionPromise;
 
     sessionPromise = (async () => {
         const modelUrl = faceSegModelUrl(baseUrl);
         if (new URL(modelUrl).origin !== self.location.origin) {
-            throw new Error('本地模型必须来自本站');
+            throw new Error(bMsg(language, '本地模型必须来自本站', 'On-device model must be served from same origin'));
         }
-        const [modelBytes, wasmBytes] = await Promise.all([cachedAsset(modelUrl), cachedAsset(wasmUrl)]);
+        const [modelBytes, wasmBytes] = await Promise.all([cachedAsset(modelUrl, language), cachedAsset(wasmUrl, language)]);
         if (modelBytes.byteLength !== FACE_SEG_MODEL.bytes || (await digest(modelBytes)) !== FACE_SEG_MODEL.sha256) {
-            throw new Error('人脸贴合模型校验失败');
+            throw new Error(bMsg(language, '人脸贴合模型校验失败', 'Face segmentation model verification failed'));
         }
         ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(2, navigator.hardwareConcurrency || 1) : 1;
         ort.env.wasm.wasmBinary = wasmBytes;
@@ -113,7 +116,7 @@ async function computeMask(req: FaceMaskRequest): Promise<{ maskBytes: Uint8Arra
     }
 
     const crops = computeFaceCropBoxes(strokes, w, h);
-    const ortSession = await ensureSession(baseUrl);
+    const ortSession = await ensureSession(baseUrl, req.language);
     const side = FACE_SEG_MODEL.inputSize;
     const aiMask = new Float32Array(w * h);
     const fallbackPaintMask = paintOnly.slice();
@@ -219,7 +222,7 @@ self.onmessage = (event: MessageEvent<FaceMaskRequest>) => {
             self.postMessage({
                 kind: 'error',
                 id: req.id,
-                message: error instanceof Error ? error.message : '人脸贴合处理失败',
+                message: error instanceof Error ? error.message : bMsg(req.language, '人脸贴合处理失败', 'Face segmentation failed'),
             });
         });
 };

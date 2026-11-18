@@ -12,7 +12,7 @@ import {
 import { cleanResults, getResult } from '../storage/enhancementStore';
 import type { EnhancementRequest } from '../enhancement/orchestrator';
 import { ParameterSlider } from './ParameterSlider';
-import { download } from '../imaging/export';
+import { prepareSingleSaveTarget } from '../imaging/export';
 import { clearLocalModelCache, isLocalModelCached } from '../enhancement/local/LocalEnhancerClient';
 import { isLocalProfile, localModels, localModel, type LocalProfile } from '../enhancement/local/modelManifest';
 import { usePreferences } from '../config/preferences';
@@ -212,9 +212,11 @@ export function EnhancementPanel(props: Props) {
                             <button
                                 className="enhance-download"
                                 onClick={() => {
-                                    void download(result.blob, `${props.tab.name.replace(/\.[^.]+$/, '')}-enhanced.png`)
-                                        .then(saved => {
-                                            if (saved) setMessage(t.pngSavedShort);
+                                    const filename = `${props.tab.name.replace(/\.[^.]+$/, '')}-enhanced.png`;
+                                    void prepareSingleSaveTarget(filename, 'png')
+                                        .then(target => (target.cancelled ? 'cancelled' : target.save(result.blob, filename)))
+                                        .then(mode => {
+                                            if (mode !== 'cancelled') setMessage(t.pngSavedShort);
                                         })
                                         .catch(error =>
                                             setMessage(

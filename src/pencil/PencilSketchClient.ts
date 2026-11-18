@@ -1,3 +1,6 @@
+import { currentMsg } from '../config/errors';
+import { getLanguage } from '../config/preferences';
+
 export interface PencilSketchResult {
     width: number;
     height: number;
@@ -48,7 +51,7 @@ export class PencilSketchClient {
             }
         };
         this.worker.onerror = event => {
-            const err = new Error(event.message || '彩铅线稿 Worker 启动失败');
+            const err = new Error(event.message || currentMsg('彩铅线稿 Worker 启动失败', 'Pencil line-art worker failed to start'));
             for (const job of this.pending.values()) job.reject(err);
             this.pending.clear();
         };
@@ -62,6 +65,7 @@ export class PencilSketchClient {
                 kind: 'warmup',
                 id,
                 baseUrl: typeof document !== 'undefined' ? document.baseURI : self.location.href,
+                language: getLanguage(),
             });
         });
     }
@@ -79,6 +83,7 @@ export class PencilSketchClient {
                     height,
                     buffer: copy.buffer,
                     baseUrl: typeof document !== 'undefined' ? document.baseURI : self.location.href,
+                    language: getLanguage(),
                 },
                 [copy.buffer],
             );
@@ -87,7 +92,7 @@ export class PencilSketchClient {
 
     dispose() {
         this.worker.terminate();
-        const err = new Error('彩铅线稿处理已取消');
+        const err = new Error(currentMsg('彩铅线稿处理已取消', 'Pencil line-art processing cancelled'));
         for (const job of this.pending.values()) job.reject(err);
         this.pending.clear();
     }

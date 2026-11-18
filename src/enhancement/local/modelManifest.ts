@@ -1,3 +1,5 @@
+import { currentMsg } from '../../config/errors';
+
 // Only trusted bundled models can select a URL/hash. Stored result images remain reusable.
 export type LocalProfile = 'liveaction' | 'omnisr' | 'anime' | 'denoise';
 export type LocalBackend = 'webgpu' | 'wasm';
@@ -29,7 +31,7 @@ export function isLocalProfile(value: unknown): value is LocalProfile {
 }
 export function localModel(profile: LocalProfile = 'liveaction'): LocalModelManifest {
     const model = localModels.find(item => item.profile === profile);
-    if (!model) throw new Error('此模型已下架，请选择受支持的本机模型');
+    if (!model) throw new Error(currentMsg('此模型已下架，请选择受支持的本机模型', 'This model is retired; please choose a supported on-device model'));
     return model;
 }
 export function localCacheDescriptor(profile: LocalProfile = 'liveaction') {
@@ -39,9 +41,14 @@ export function localCacheDescriptor(profile: LocalProfile = 'liveaction') {
         pipelineVersion: profile === 'liveaction' ? 3 : 4, profile };
 }
 export function checkLocalResources(width: number, height: number, model: LocalModelManifest) {
-    if (width * height > model.maxInputPixels) throw new Error(`${model.label} 支持最多 ${model.maxInputPixels / 1000000} MP 输入，请先缩小照片`);
+    if (width * height > model.maxInputPixels) {
+        const mp = model.maxInputPixels / 1000000;
+        throw new Error(currentMsg(`${model.label} 支持最多 ${mp} MP 输入，请先缩小照片`, `${model.label} supports up to ${mp} MP input; please resize the photo first`));
+    }
     const estimatedBytes = width * height * (model.scale ** 2 * 16 + 24) + 128 * 1048576;
-    if (estimatedBytes > 768 * 1048576) throw new Error('图片超过本机内存预算，请先缩小照片');
+    if (estimatedBytes > 768 * 1048576) {
+        throw new Error(currentMsg('图片超过本机内存预算，请先缩小照片', 'Photo exceeds local memory budget; please resize before enhancing'));
+    }
     return estimatedBytes;
 }
 export function modelAssetUrl(model: LocalModelManifest, baseUrl: string) {

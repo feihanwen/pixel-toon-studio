@@ -1,16 +1,28 @@
-import { STYLES, GLOBAL, styleParams, styleShortName, type StyleId, type GlobalKey } from '../config/styles';
+import {
+    CORE_PARAM_KEYS,
+    GLOBAL,
+    STYLES,
+    STYLE_PRESETS,
+    matchingStylePresetId,
+    styleParams,
+    styleShortName,
+    type GlobalKey,
+    type StyleId,
+} from '../config/styles';
 import type { EditorSnapshot, PhotoTab, ExifFields } from '../types/document';
 import { captionText } from '../config/captions';
 import { frameCategoryLabel, frameStyleName, getFrameStyle } from '../config/frames';
 import { frameKind, type FrameContent } from '../imaging/frame';
 import { usePreferences } from '../config/preferences';
 import { uiText } from '../config/i18n';
+import type { ExportFormat } from '../imaging/export';
 import { ParameterSlider } from './ParameterSlider';
 import { StudioIcon } from './StudioIcon';
 import { duotonePalette } from '../worker/styles/duotone';
 import { useEffect, useRef, type ReactNode } from 'react';
 
 interface Props {
+    topBanner?: ReactNode;
     enhancementPanel?: ReactNode;
     mosaicPanel?: ReactNode;
     pickerPanel?: ReactNode;
@@ -19,9 +31,11 @@ interface Props {
     tabCount?: number;
     snapshot: EditorSnapshot | null;
     exif: ExifFields | null;
+    exportFormat: ExportFormat;
     exporting: boolean;
     exportProgress: string;
     onStyle: (style: StyleId) => void;
+    onApplyPreset: (params: Record<string, number>) => void;
     onParam: (key: string, value: number) => void;
     onGlobal: (key: GlobalKey, value: number) => void;
     onCommit: () => void;
@@ -33,7 +47,8 @@ interface Props {
     onExif: (value: boolean) => void;
     onCaption: () => void;
     onOpenCaption: () => void;
-    onSyncAll?: () => void;
+    onExportFormatChange: (format: ExportFormat) => void;
+    onOpenBatchExport: () => void;
     onExport: () => void;
     onUndo: () => void;
     onRedo: () => void;
@@ -55,10 +70,16 @@ export function ControlsPanel(props: Props) {
         exif,
     };
     const definitions = s ? styleParams(s.styleId) : null;
+    const coreKeys: readonly string[] = s ? CORE_PARAM_KEYS[s.styleId] : [];
+    const advancedEntries = definitions
+        ? Object.entries(definitions).filter(([key]) => !coreKeys.includes(key))
+        : [];
+    const presets = s ? STYLE_PRESETS[s.styleId] : [];
+    const activePresetId = s ? matchingStylePresetId(s.styleId, s.params[s.styleId]) : null;
     const isExifContent = Boolean(content.showExif && content.exif && Object.values(content.exif).some(Boolean));
 
     useEffect(() => {
-        if (isPicking && asideRef.current) {
+        if ((isPicking || props.topBanner) && asideRef.current) {
             asideRef.current.scrollTop = 0;
         }
         if (wasPickingRef.current && !isPicking) {
@@ -66,7 +87,7 @@ export function ControlsPanel(props: Props) {
             returnFocusRef.current = null;
         }
         wasPickingRef.current = isPicking;
-    }, [isPicking]);
+    }, [isPicking, Boolean(props.topBanner)]);
 
     function openFrameStylePicker() {
         returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -81,6 +102,7 @@ export function ControlsPanel(props: Props) {
     return (
         <aside ref={asideRef} className={`controls${isPicking ? ' is-picking' : ''}`} aria-label={t.controlsAria}>
             {isPicking ? pickerPanel : null}
+            {!isPicking ? props.topBanner : null}
             <div className="controls-top">
                 <div className="controls-title">
                     <span className="controls-symbol">
@@ -146,6 +168,21 @@ export function ControlsPanel(props: Props) {
                                 </button>
                             ))}
                         </div>
+                        <div className="style-presets-block">
+                            <span className="style-presets-label">{t.stylePresetsLabel}</span>
+                            <div className="preset-pills" role="group" aria-label={t.stylePresetsLabel}>
+                                {presets.map(preset => (
+                                    <button
+                                        key={preset.id}
+                                        type="button"
+                                        aria-pressed={activePresetId === preset.id}
+                                        onClick={() => props.onApplyPreset(preset.params)}
+                                    >
+                                        {language === 'en' ? preset.labelEn : preset.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </section>
 
                     <details className="control-section style-parameters">
@@ -167,20 +204,45 @@ export function ControlsPanel(props: Props) {
                                 </div>
                             )}
                             {definitions &&
-                                Object.entries(definitions).map(([key, p]) => (
-                                    <ParameterSlider
-                                        key={`${s.styleId}-${key}`}
-                                        label={language === 'en' ? p.labelEn : p.label}
-                                        value={s.params[s.styleId][key]}
-                                        min={p.min}
-                                        max={p.max}
-                                        unit={language === 'en' ? (p.unitEn ?? p.unit) : p.unit}
-                                        defaultValue={p.default}
-                                        onChange={v => props.onParam(key, v)}
-                                        onCommit={props.onCommit}
-                                        onReset={() => props.onResetParam(key)}
-                                    />
-                                ))}
+                                coreKeys.map(key => {
+                                    const p = definitions[key];
+                                    if (!p) return null;
+                                    return (
+                                        <ParameterSlider
+                                            key={`${s.styleId}-${key}`}
+                                            label={language === 'en' ? p.labelEn : p.label}
+                                            value={s.params[s.styleId][key]}
+                                            min={p.min}
+                                            max={p.max}
+                                            unit={language === 'en' ? (p.unitEn ?? p.unit) : p.unit}
+                                            defaultValue={p.default}
+                                            onChange={v => props.onParam(key, v)}
+                                            onCommit={props.onCommit}
+                                            onReset={() => props.onResetParam(key)}
+                                        />
+                                    );
+                                })}
+                            {advancedEntries.length > 0 && (
+                                <details className="enhance-settings style-advanced-tuning">
+                                    <summary>{t.advancedTuningSummary}</summary>
+                                    <div className="style-advanced-body">
+                                        {advancedEntries.map(([key, p]) => (
+                                            <ParameterSlider
+                                                key={`${s.styleId}-${key}`}
+                                                label={language === 'en' ? p.labelEn : p.label}
+                                                value={s.params[s.styleId][key]}
+                                                min={p.min}
+                                                max={p.max}
+                                                unit={language === 'en' ? (p.unitEn ?? p.unit) : p.unit}
+                                                defaultValue={p.default}
+                                                onChange={v => props.onParam(key, v)}
+                                                onCommit={props.onCommit}
+                                                onReset={() => props.onResetParam(key)}
+                                            />
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
                         </div>
                     </details>
 
@@ -304,18 +366,39 @@ export function ControlsPanel(props: Props) {
                                 {t.redoButton}
                             </button>
                         </div>
-                        {(props.tabCount ?? 0) > 1 && props.onSyncAll && (
+                        {(props.tabCount ?? 0) >= 1 && (
                             <button
                                 type="button"
                                 className="sync-tabs-button"
-                                onClick={props.onSyncAll}
+                                onClick={props.onOpenBatchExport}
                                 disabled={props.exporting}
                             >
-                                {t.syncAllTabsButton(props.tabCount ?? 0)}
+                                {t.batchExportOpenBtn(props.tabCount ?? 0)}
                             </button>
                         )}
+                        <div className="export-format-toggle" role="group" aria-label={t.exportFormatLabel}>
+                            <button
+                                type="button"
+                                aria-pressed={props.exportFormat === 'png'}
+                                disabled={props.exporting}
+                                onClick={() => props.onExportFormatChange('png')}
+                            >
+                                {t.exportFormatPng}
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={props.exportFormat === 'jpeg'}
+                                disabled={props.exporting}
+                                onClick={() => props.onExportFormatChange('jpeg')}
+                            >
+                                {t.exportFormatJpeg}
+                            </button>
+                        </div>
                         <button className="export-button" onClick={props.onExport} disabled={props.exporting}>
-                            {props.exporting ? t.exportingButton(props.exportProgress) : t.exportButton} <span>↗</span>
+                            {props.exporting
+                                ? t.exportingButton(props.exportProgress)
+                                : t.exportButtonWithFormat(props.exportFormat === 'jpeg' ? 'JPEG' : 'PNG')}{' '}
+                            <span>↗</span>
                         </button>
                         <div className="export-note">
                             {s.frameEnabled

@@ -1,3 +1,5 @@
+import { currentMsg } from '../../config/errors';
+import { getLanguage } from '../../config/preferences';
 import { decode } from '../../imaging/decode';
 import { checkDimensions } from '../domain';
 import { checkLocalResources, localModel, localModels, modelAssetUrl, type LocalProfile, type LocalBackend } from './modelManifest';
@@ -49,24 +51,24 @@ export async function enhanceLocal(blob: Blob, signal: AbortSignal, onProgress: 
     let succeeded = false;
     try {
         return await new Promise<LocalOutput>((resolve, reject) => {
-            const abort = () => { finish(); worker.terminate(); reject(new DOMException('处理已取消', 'AbortError')); };
+            const abort = () => { finish(); worker.terminate(); reject(new DOMException(currentMsg('处理已取消', 'Enhancement cancelled'), 'AbortError')); };
             signal.addEventListener('abort', abort, { once: true });
             const finish = () => signal.removeEventListener('abort', abort);
             worker.onmessage = event => {
                 if (event.data.id !== 1) return;
                 if (event.data.kind === 'progress') onProgress(event.data.progress, event.data.message);
                 if (event.data.kind === 'fallback' || event.data.gpuDisabled) failedGpu.add(profile);
-                if (event.data.kind === 'fallback') onProgress(0, '设备加速不可用，正在切换本机兼容模式，可能较慢…');
+                if (event.data.kind === 'fallback') onProgress(0, currentMsg('设备加速不可用，正在切换本机兼容模式，可能较慢…', 'GPU acceleration unavailable; switching to CPU compatibility mode…'));
                 if (event.data.kind === 'result') { finish(); succeeded = true; resolve(event.data); }
                 if (event.data.kind === 'error') { finish(); reject(event.data.retryWasm ? new RetryWasmError(event.data.message) : new Error(event.data.message)); }
             };
-            worker.onerror = () => { finish(); reject(new Error('本地推理 Worker 运行失败，请重试')); };
-            worker.postMessage({ id: 1, width: pixels.width, height: pixels.height, buffer: pixels.data.buffer, profile, baseUrl: document.baseURI, skipGpu: forceWasm || failedGpu.has(profile) }, [pixels.data.buffer]);
+            worker.onerror = () => { finish(); reject(new Error(currentMsg('本地推理 Worker 运行失败，请重试', 'On-device inference worker failed; please try again'))); };
+            worker.postMessage({ id: 1, width: pixels.width, height: pixels.height, buffer: pixels.data.buffer, profile, baseUrl: document.baseURI, skipGpu: forceWasm || failedGpu.has(profile), language: getLanguage() }, [pixels.data.buffer]);
         });
     } catch (error) {
         if (!(error instanceof RetryWasmError)) throw error;
         worker.terminate(); failedGpu.add(profile);
-        onProgress(0, '设备加速失败，正在重新启动本机兼容模式，可能较慢…');
+        onProgress(0, currentMsg('设备加速失败，正在重新启动本机兼容模式，可能较慢…', 'GPU acceleration failed; restarting in CPU compatibility mode…'));
         signal.throwIfAborted();
         // A fresh Worker also recovers from unrecoverable ORT init/device state.
         return await enhanceLocal(blob, signal, onProgress, profile, true);

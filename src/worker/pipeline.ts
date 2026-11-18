@@ -1,3 +1,4 @@
+import { bMsg } from '../config/errors';
 import { popArt } from './styles/popArt';
 import { applyAutoColor } from '../imaging/autoColor';
 import { applyPostStyleChromaGuard, applyPreStyleMosaic, resolveTileMosaicMask } from '../mosaic/mosaicEngine';
@@ -59,7 +60,7 @@ export function render(req: RenderRequest): ArrayBuffer {
             break;
         default: {
             const unknown: never = req.styleId;
-            throw new Error(`未知视觉风格：${unknown}`);
+            throw new Error(bMsg(req.language, `未知视觉风格：${unknown}`, `Unknown visual style: ${unknown}`));
         }
     }
     if (mosaicMask && req.mosaic) {

@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../config/preferences';
 import type { StyleId } from '../config/styles';
 import type { MosaicStroke } from './mosaic';
 
@@ -45,6 +46,7 @@ export interface RenderRequest {
     autoColor?: import('../imaging/autoColor').AutoColorPlan | null;
     mosaic?: RenderMosaic;
     pencilSketch?: RenderPencilSketch;
+    language?: AppLanguage;
     buffer: ArrayBuffer;
 }
 export interface RenderResult {

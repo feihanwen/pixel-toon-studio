@@ -53,6 +53,22 @@
 .frame-style-title-row code { font-size: 10px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .frame-style-meta p { margin: 0; font-size: 10px; color: var(--secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .frame-style-meta small { font-size: 9px; color: var(--muted); }
+.batch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 18px 10px; flex-shrink: 0; }
+.batch-select-all-btn { border: 1px solid var(--accent-border); background: var(--accent-soft); color: var(--accent); border-radius: 16px; padding: 6px 12px; font-size: 11px; font-weight: 600; }
+.batch-select-all-btn:hover:not(:disabled) { background: var(--glass-hover); }
+.batch-count-label { font-size: 11px; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.batch-format-row { display: flex; gap: 4px; margin: 0 18px 10px; padding: 3px; border: 1px solid var(--glass-border); border-radius: 14px; background: var(--glass); flex-shrink: 0; }
+.batch-format-row button { flex: 1; padding: 6px 8px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--secondary); font-size: 11px; font-weight: 550; }
+.batch-format-row button[aria-pressed="true"] { background: var(--glass-strong); border-color: var(--accent-border); color: var(--text); font-weight: 600; }
+.caption-list button.batch-photo-item { min-height: 58px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 10px 12px; }
+.caption-list button.batch-photo-item.is-current { border-color: var(--accent); }
+.batch-checkbox { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--glass-border); background: var(--glass-strong); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--accent-text); flex-shrink: 0; }
+.batch-checkbox.checked { background: var(--accent); border-color: var(--accent); }
+.batch-photo-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.batch-photo-title-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.batch-photo-index { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.batch-photo-title-row strong { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.batch-photo-meta small { font-size: 10px; color: var(--muted); }
 @media (max-width: 760px) {
   .controls.is-picking { overflow: hidden; }
   .inline-picker .caption-list { max-height: 52dvh; }

@@ -16,11 +16,19 @@ import { PreferencesProvider, usePreferences, isLanguageChosen } from './config/
 import { uiText } from './config/i18n';
 import type { EditorSnapshot, ExifFields, PhotoTab } from './types/document';
 import { snapshot } from './types/document';
-import { initialSnapshot, cloneSnapshot, applySharedSettings, commit, moveHistory } from './state/history';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { BatchExportPanel } from './components/BatchExportPanel';
+import { initialSnapshot, cloneSnapshot, commit, moveHistory } from './state/history';
 import { decode, toImageData, imageDataCanvas, FILE_ACCEPT, prepareImageImport } from './imaging/decode';
 import { detectExif, parseExif } from './imaging/exif';
 import { WorkerClient } from './imaging/workerClient';
-import { exportPng, exportFilename, download } from './imaging/export';
+import {
+    exportImage,
+    exportFilename,
+    prepareBatchSaveTarget,
+    prepareSingleSaveTarget,
+    type ExportFormat,
+} from './imaging/export';
 import { CanvasStage } from './components/CanvasStage';
 import { ControlsPanel } from './components/ControlsPanel';
 import { CaptionPickerDialog } from './components/CaptionPickerDialog';
@@ -60,9 +68,11 @@ type FrameStylePickerState = {
 
 export function App() {
     return (
-        <PreferencesProvider>
-            <AppContent />
-        </PreferencesProvider>
+        <ErrorBoundary>
+            <PreferencesProvider>
+                <AppContent />
+            </PreferencesProvider>
+        </ErrorBoundary>
     );
 }
 
@@ -80,8 +90,12 @@ function AppContent() {
     const [importing, setImporting] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
     const [exporting, setExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState('');
+    const [batchExportOpen, setBatchExportOpen] = useState(false);
+    const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([]);
+    const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
     const [showOriginal, setShowOriginal] = useState(false);
     const [dialog, setDialog] = useState<string | null>(null);
     const [showLanguageOnboarding, setShowLanguageOnboarding] = useState(() => !isLanguageChosen());
@@ -146,6 +160,8 @@ function AppContent() {
         const liveIds = new Set(tabs.map(item => item.id));
         pencilSketchCache.current.pruneTabs(liveIds);
         setPencilSketch(prev => (prev && !liveIds.has(prev.tabId) ? null : prev));
+        setBatchSelectedIds(prev => prev.filter(id => liveIds.has(id)));
+        if (tabs.length === 0) setBatchExportOpen(false);
     }, [tabs]);
 
     const { ready, saveFailed, markDirty, hasDirty, removeTabFromStorage, flushWorkspace } = useWorkspaceSync({
@@ -519,28 +535,19 @@ function AppContent() {
         );
     }
 
-    function syncAllTabs() {
-        if (!active || !current || tabs.length <= 1) return;
-        const sourceSnapshot = cloneSnapshot(current);
+    function openBatchExport() {
+        if (!tabs.length) return;
         finishDraft();
-        let syncedCount = 0;
-        setTabs(prev =>
-            prev.map(item => {
-                if (item.id === active.id) return item;
-                const nextSnapshot = applySharedSettings(sourceSnapshot, snapshot(item));
-                const nextHistory = commit(item.history, nextSnapshot);
-                if (nextHistory !== item.history) {
-                    markDirty(item.id);
-                    syncedCount++;
-                }
-                return { ...item, history: nextHistory };
-            }),
-        );
-        setNotice(
-            syncedCount > 0
-                ? t.syncNoticeUpdated(styleShortName(sourceSnapshot.styleId, language), tabs.length - 1)
-                : t.syncNoticeUnchanged,
-        );
+        setCaptionPicker(null);
+        setFrameStylePicker(null);
+        setBatchSelectedIds(tabs.map(item => item.id));
+        setBatchExportOpen(true);
+    }
+
+    function toggleBatchTab(id: string) {
+        finishDraft();
+        setBatchSelectedIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]));
+        setActiveId(id);
     }
 
     function beginEnhancement(request: EnhancementRequest) {
@@ -594,6 +601,7 @@ function AppContent() {
         if (!active || !current) return;
         finishDraft();
         setCaptionPicker(null);
+        setBatchExportOpen(false);
         setFrameStylePicker({
             tabId: active.id,
             originalId: current.frameStyleId,
@@ -614,6 +622,7 @@ function AppContent() {
         if (!active || !current) return;
         finishDraft();
         setFrameStylePicker(null);
+        setBatchExportOpen(false);
         setCaptionPicker({
             tabId: active.id,
             originalId: current.captionId,
@@ -760,6 +769,18 @@ function AppContent() {
 
     async function doExport() {
         if (!active || !current || exporting) return;
+        const filename = exportFilename(
+            active.name,
+            current.styleId,
+            current.enhancement.enabled && current.enhancement.strength > 0,
+            exportFormat,
+        );
+        const fmtLabel = exportFormat === 'jpeg' ? 'JPEG' : 'PNG';
+        const saveTarget = await prepareSingleSaveTarget(filename, exportFormat);
+        if (saveTarget.cancelled) {
+            setNotice(t.exportCancelled);
+            return;
+        }
         const exportTab = { ...active, history: commit(active.history, current) };
         finishDraft();
         setExporting(true);
@@ -776,7 +797,7 @@ function AppContent() {
             const readyExportPencilSketch = exportSketchSource
                 ? { width: exportSketchSource.width, height: exportSketchSource.height, sketchBuffer: exportSketchSource.sketchBuffer }
                 : null;
-            const blob = await exportPng(
+            const blob = await exportImage(
                 exportTab,
                 {
                     ...content,
@@ -787,22 +808,92 @@ function AppContent() {
                 (done, total) => setExportProgress(`${Math.round((done / total) * 100)}%`),
                 readyExportMask,
                 readyExportPencilSketch,
+                exportFormat,
             );
-            const saved = await download(
-                blob,
-                exportFilename(
-                    active.name,
-                    current.styleId,
-                    current.enhancement.enabled && current.enhancement.strength > 0,
-                ),
-            );
-            if (saved) {
-                setNotice(window.pixelToonDesktop ? t.pngSavedDesktop : t.pngSavedBrowser);
-            }
+            const mode = await saveTarget.save(blob, filename);
+            if (mode === 'desktop') setNotice(t.imageSavedDesktop(fmtLabel));
+            else if (mode === 'picker') setNotice(t.imageSavedPicker(fmtLabel));
+            else if (mode === 'download') setNotice(t.imageSavedBrowser(fmtLabel));
         } catch (e) {
             setNotice(t.exportFailed(e instanceof Error ? e.message : t.unknownError));
         } finally {
             setExporting(false);
+        }
+    }
+
+    async function doBatchExport() {
+        if (exporting || batchSelectedIds.length === 0) return;
+        const selectedTabs = tabs.filter(tab => batchSelectedIds.includes(tab.id));
+        if (!selectedTabs.length) return;
+        const target = await prepareBatchSaveTarget();
+        if (!target) {
+            setNotice(t.exportCancelled);
+            return;
+        }
+        finishDraft();
+        setExporting(true);
+        setBatchProgress({ done: 0, total: selectedTabs.length });
+        const fmtLabel = exportFormat === 'jpeg' ? 'JPEG' : 'PNG';
+        try {
+            let exportedCount = 0;
+            for (const tab of selectedTabs) {
+                const s = snapshot(tab);
+                const tabExif =
+                    s.showExif && tab.exifConsent
+                        ? (exifData[tab.id] ?? (await parseExif(tab.blob).catch(() => null)))
+                        : null;
+                const readyMask =
+                    tab.id === activeId && mosaicMask && mosaicMask.key === mosaicMaskKey
+                        ? { width: mosaicMask.width, height: mosaicMask.height, maskBuffer: mosaicMask.maskBuffer }
+                        : null;
+                const exportSketchSource =
+                    tab.id === activeId && s.styleId === 'pencil'
+                        ? (pencilSketch?.key === pencilSketchKey
+                              ? pencilSketch
+                              : pencilSketchCache.current.get(pencilSketchKey))
+                        : null;
+                const readyPencilSketch = exportSketchSource
+                    ? {
+                          width: exportSketchSource.width,
+                          height: exportSketchSource.height,
+                          sketchBuffer: exportSketchSource.sketchBuffer,
+                      }
+                    : null;
+                const blob = await exportImage(
+                    tab,
+                    {
+                        frameStyleId: s.frameStyleId,
+                        captionId: s.captionId,
+                        showExif: s.showExif,
+                        exif: tabExif,
+                    },
+                    () => {},
+                    readyMask,
+                    readyPencilSketch,
+                    exportFormat,
+                );
+                const filename = exportFilename(
+                    tab.name,
+                    s.styleId,
+                    s.enhancement.enabled && s.enhancement.strength > 0,
+                    exportFormat,
+                );
+                await target.save(blob, filename, exportFormat);
+                exportedCount++;
+                setBatchProgress({ done: exportedCount, total: selectedTabs.length });
+            }
+            setBatchExportOpen(false);
+            setNotice(
+                target.mode === 'download'
+                    ? t.batchSavedBrowser(exportedCount, fmtLabel)
+                    : t.batchSavedFolder(exportedCount, fmtLabel),
+            );
+        } catch (e) {
+            setNotice(t.exportFailed(e instanceof Error ? e.message : t.unknownError));
+        } finally {
+            await target.finish().catch(() => {});
+            setExporting(false);
+            setBatchProgress(null);
         }
     }
 
@@ -993,12 +1084,60 @@ function AppContent() {
                 </div>
 
                 <ControlsPanel
+                    topBanner={
+                        showLanguageOnboarding || dialog ? (
+                            <>
+                                {showLanguageOnboarding && (
+                                    <LanguageOnboardingDialog onClose={() => setShowLanguageOnboarding(false)} />
+                                )}
+                                {dialog && (
+                                    <div className="inline-privacy-card" role="region" aria-labelledby="privacy-title">
+                                        <div className="inline-privacy-head">
+                                            <span className="inline-onboarding-icon" aria-hidden="true">
+                                                ◈
+                                            </span>
+                                            <div>
+                                                <span className="eyebrow">PRIVACY FIRST</span>
+                                                <h3 id="privacy-title">{t.privacyModalTitle}</h3>
+                                            </div>
+                                        </div>
+                                        <p>{t.privacyModalBody}</p>
+                                        <div className="inline-privacy-actions">
+                                            <button type="button" onClick={() => decideExif(false)}>
+                                                {t.privacyDecline}
+                                            </button>
+                                            <button type="button" className="primary" onClick={() => decideExif(true)}>
+                                                {t.privacyAllow}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : null
+                    }
                     tab={active}
                     tabCount={tabs.length}
                     snapshot={current}
                     outputSize={outputSize}
                     pickerPanel={
-                        frameStylePicker && frameStylePicker.tabId === activeId ? (
+                        batchExportOpen ? (
+                            <BatchExportPanel
+                                tabs={tabs}
+                                activeId={activeId}
+                                selectedIds={batchSelectedIds}
+                                format={exportFormat}
+                                exporting={exporting}
+                                batchProgress={batchProgress}
+                                onToggleTab={toggleBatchTab}
+                                onSelectAll={() => setBatchSelectedIds(tabs.map(item => item.id))}
+                                onClearAll={() => setBatchSelectedIds([])}
+                                onFormatChange={setExportFormat}
+                                onExportSelected={() => {
+                                    void doBatchExport();
+                                }}
+                                onClose={() => setBatchExportOpen(false)}
+                            />
+                        ) : frameStylePicker && frameStylePicker.tabId === activeId ? (
                             <FrameStylePickerDialog
                                 selectedId={frameStylePicker.previewId}
                                 photoWidth={outputSize?.width ?? active?.width}
@@ -1162,9 +1301,19 @@ function AppContent() {
                         ) : null
                     }
                     exif={active ? (exifData[active.id] ?? null) : null}
+                    exportFormat={exportFormat}
                     exporting={exporting}
                     exportProgress={exportProgress}
                     onStyle={styleId => commitEdit(s => ({ ...s, styleId }))}
+                    onApplyPreset={presetParams =>
+                        commitEdit(s => ({
+                            ...s,
+                            params: {
+                                ...s.params,
+                                [s.styleId]: { ...s.params[s.styleId], ...presetParams },
+                            },
+                        }))
+                    }
                     onParam={(key, value) =>
                         changeDraft(s => {
                             s.params[s.styleId][key] = value;
@@ -1202,7 +1351,8 @@ function AppContent() {
                         commitEdit(s => ({ ...s, captionId: id }));
                     }}
                     onOpenCaption={openCaptionPicker}
-                    onSyncAll={syncAllTabs}
+                    onExportFormatChange={setExportFormat}
+                    onOpenBatchExport={openBatchExport}
                     onExport={doExport}
                     onUndo={() => undo(-1)}
                     onRedo={() => undo(1)}
@@ -1236,30 +1386,6 @@ function AppContent() {
                         {t.dropOverlayTitle}
                         <br />
                         <span>HEIC · PNG · JPEG · WebP</span>
-                    </div>
-                </div>
-            )}
-            {showLanguageOnboarding && (
-                <LanguageOnboardingDialog onClose={() => setShowLanguageOnboarding(false)} />
-            )}
-            {dialog && (
-                <div
-                    className="modal-backdrop"
-                    onMouseDown={e => {
-                        if (e.target === e.currentTarget) decideExif(false);
-                    }}
-                >
-                    <div className="modal" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
-                        <div className="modal-icon">◈</div>
-                        <span className="eyebrow">PRIVACY FIRST</span>
-                        <h2 id="privacy-title">{t.privacyModalTitle}</h2>
-                        <p>{t.privacyModalBody}</p>
-                        <div className="modal-actions">
-                            <button onClick={() => decideExif(false)}>{t.privacyDecline}</button>
-                            <button className="primary" onClick={() => decideExif(true)}>
-                                {t.privacyAllow}
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}

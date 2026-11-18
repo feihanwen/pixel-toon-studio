@@ -16,6 +16,10 @@ declare global {
             nextImage(): Promise<{ name: string; type: string; bytes: Uint8Array<ArrayBuffer> } | { error: string } | null>;
             onImagesAvailable(listener: () => void): () => void;
             savePng(bytes: Uint8Array, name: string): Promise<boolean>;
+            saveImage?(bytes: Uint8Array, name: string, format: 'png' | 'jpeg'): Promise<boolean>;
+            pickExportDir?(): Promise<boolean>;
+            saveBatchImage?(bytes: Uint8Array, name: string, format: 'png' | 'jpeg'): Promise<boolean>;
+            endBatchExport?(): Promise<void>;
             onCommand(listener: (command: DesktopCommand) => void): () => void;
             onBeforeClose(listener: () => Promise<void>): () => void;
             setPreferences?(prefs: DesktopPreferencesPayload): Promise<void>;

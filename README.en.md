@@ -5,7 +5,12 @@
   <p><strong>Transform everyday photos into anime stills, painted artworks, or vintage postcards.</strong></p>
   <p>100% on-device · Zero setup · Zero uploads · Privacy-first · No API keys required</p>
   <p>
+    <a href="https://pixelstudio-y.vercel.app/"><strong>🌐 Try Live Web Demo (pixelstudio-y.vercel.app)</strong></a>
+  </p>
+  <p>
     <a href="#feature-overview">Features</a>
+    &nbsp; · &nbsp;
+    <a href="#system-architecture">Architecture</a>
     &nbsp; · &nbsp;
     <a href="#real-world-examples">See Results</a>
     &nbsp; · &nbsp;
@@ -21,7 +26,7 @@
 
 ![Pixel & Toon Studio editor interface: real-time split view comparison between coastal town original photo and watercolor effect](docs/showcase/editor.jpg)
 
-**Pixel & Toon Studio** is a private, on-device creative photo studio for desktop and web. Turn everyday snapshots into Cel Shaded Anime, 2D Pixel Line Art, Watercolor & Impasto, Pop Art Halftone, Manga Screentone, AI-assisted Colored Pencil Sketch, Duotone Posters, or Vintage 35mm Film. Complete your creation with **Smart Mosaic Brush (AI Face Contour Fit)**, **Smart Color v2**, **4 on-device AI super-resolution & denoise models**, **27 themed Polaroid frames**, **48 bilingual captions**, custom text, or camera EXIF specs — ready to export as high-resolution PNG keepsake cards in one click.
+**Pixel & Toon Studio** is a private, on-device creative photo studio for desktop and web. Turn everyday snapshots into Cel Shaded Anime, 2D Pixel Line Art, Watercolor & Impasto, Pop Art Halftone, Manga Screentone, AI-assisted Colored Pencil Sketch, Duotone Posters, or Vintage 35mm Film. Complete your creation with **Smart Mosaic Brush (AI Face Contour Fit)**, **Smart Color v2**, **4 on-device AI super-resolution & denoise models**, **27 themed Polaroid frames**, **48 bilingual captions**, custom text, or camera EXIF specs — ready for single or selective batch export as high-resolution **PNG / JPEG** keepsake cards.
 
 All image decoding, canvas shader pipelines, and 6 bundled ONNX neural networks execute locally on your device. **No accounts, no API keys, and zero photo uploads.** Your photos never leave your computer.
 
@@ -29,16 +34,55 @@ All image decoding, canvas shader pipelines, and 6 bundled ONNX neural networks 
 
 ## Feature Overview
 
-- 🎨 **8 Distinct Visual Styles**: Cel Shaded Anime (Oklab perceptual bilateral filtering), 2D Pixel Line Art (2×2 morphological cleanup + Sobel 4-sector NMS edges), Watercolor & Impasto, Pop Art Halftone, Manga Screentone, Colored Pencil Sketch (**with on-device neural line-art extraction + multi-angle cross-hatching**), Duotone Poster, and Vintage Film. Every style includes 6–7 fine-tuning sliders with double-click reset.
+- 🎨 **8 Distinct Visual Styles & Quick Presets**: Cel Shaded Anime (Oklab perceptual bilateral filtering), 2D Pixel Line Art (2×2 morphological cleanup + Sobel 4-sector NMS edges), Watercolor & Impasto, Pop Art Halftone, Manga Screentone, Colored Pencil Sketch (**with on-device neural line-art extraction + multi-angle cross-hatching**), Duotone Poster, and Vintage Film. Each style ships with **3 curated preset pills**, **3 core sliders**, and a collapsible **Advanced Tuning** drawer with double-click reset.
 - 🖌 **Smart Mosaic Brush (AI Face Contour Fit)**: Paint or erase mosaic privacy masks directly on the preview canvas with adjustable Brush Size (`8–120`) and Mosaic Strength (`0–100%`). With **AI Face Contour Fit** enabled, the bundled multi-class face segmentation model snaps the mask cleanly to facial skin while keeping hair and jawlines crisp; non-face regions smoothly fall back to edge-aware diffusion. A pre-style frosted diffusion + post-style chroma guard pipeline keeps mosaic zones natural across all 8 styles and tiled HD exports.
 - 🧠 **4 On-Device AI Super-Resolution & Denoise Models**: Powered by ONNX Runtime Web with **WebGPU hardware acceleration** and **CPU/WASM SIMD fallback** (switchable in More Settings). Includes LiveAction (`×2`), OmniSR (`×2`), RealESR-Anime (`×2`), and NAFNet (`1×` denoise), plus **4 Texture Presets** (Balanced, Crisp Lines, Soft Focus, Clean Denoise) and **4 post-processing sliders** (Blend Strength, Adaptive USM Sharpen, Local Clarity, Edge Denoise).
 - 🪄 **Smart Color v2 & 6-Channel Light Adjustments**: Deterministic histogram & neutral-gray white balance optimizer with live diagnostic badges (*Shadows Lifted*, *Highlights Tamed*, *Contrast Boosted*, *Warmed Tone*, *Cast Corrected*), main strength slider, and 4 fine-tuning offsets (Exposure, Tone Contrast, Temperature, Vibrance) — paired with 6 global sliders (Brightness, Contrast, Saturation, Highlights, Shadows, Temperature).
 - 🖼 **27 Themed Instant Polaroid Frames**: Spanning 6 curated categories (Solid Classic, Dreamy Gradient, Retro Pattern, Anime & Pop, Paper & Texture, Collage & DIY), dynamically rendered on Canvas to fit your photo's native aspect ratio with one-click shuffle.
 - ✍️ **48 Bilingual Captions, Custom Text & Camera EXIF**: Filterable by language and 8 themes, plus custom text notes (up to 48 characters) and privacy-consented camera EXIF readout (model, shutter speed, aperture, ISO, and capture date).
-- 📑 **Multi-Tab Workspace & One-Click Style Sync**: Edit multiple photos in parallel tabs with independent undo/redo history, and sync your active style, parameters, frame, and color settings across all open tabs with one click.
-- ⚡ **Multi-Threaded Tiled HD PNG Export**: Web Worker 768 px tiled rendering with dynamic style/mosaic halo padding exports up to **24 MP / 12,000 px** seamless PNGs while automatically stripping sensitive GPS & EXIF metadata.
+- 📑 **Multi-Tab Workspace & Selective Batch Export**: Edit multiple photos in parallel tabs with independent undo/redo history; open *Select & Export* in the sidebar to check photos (with Select All, clicking any photo switches the left canvas preview) and export as **PNG (Lossless)** or **JPEG (Compact)**.
+- ⚡ **Multi-Threaded Tiled HD Export & Custom Save Location**: Web Worker 768 px tiled rendering with dynamic style/mosaic halo padding exports up to **24 MP / 12,000 px** seamless PNG or JPEG files while stripping sensitive GPS & EXIF metadata; supports picking save files/folders directly on Desktop and Chromium browsers.
 - 🌐 **Full Bilingual UI & 6 Glassmorphic Theme Palettes**: First-launch language onboarding and Preferences popover for instant live switching between **English / 简体中文** (across all styles, sliders, frames, captions, and native desktop menus), **System / Light / Dark** appearance, and 6 theme colors (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
 - 💻 **macOS & Windows Offline Desktop App & PWA**: Native builds for **macOS** (`.dmg`) and **Windows** (NSIS installer & standalone Portable `.exe`) with HEIC/HEIF decoding, OS file associations, drag-and-drop, Dock drop, platform shortcuts, and offline PWA support.
+
+---
+
+## System Architecture
+
+All image decoding, shader pipelines, 6 ONNX neural networks, and tiled exports execute entirely on-device with zero uploads or external API requests:
+
+```mermaid
+flowchart TB
+    subgraph Client["Host Runtime (100% Offline Same-Origin)"]
+        Web["Web / PWA (Service Worker Offline Cache)"]
+        Desktop["Electron Desktop (pixel-toon://studio Protocol + Strict CSP)"]
+    end
+
+    subgraph UI["React Editor Main Thread (ErrorBoundary Protected)"]
+        Stage["CanvasStage Preview\n(Effect / Split Compare / Zoom & Pan / Mosaic Brush)"]
+        Sidebar["Non-Blocking Right Sidebar\nPresets · Core & Advanced Sliders · Frames · Batch Export"]
+        DB["Local Storage\nIndexedDB (Workspace/Results) + Cache Storage (Model Weights)"]
+    end
+
+    subgraph Workers["Web Worker Parallel Compute"]
+        StyleWorker["Render Worker Pool\n8 Deterministic Styles + 768px Halo Tiled Export (PNG/JPEG)"]
+        EnhanceWorker["ai.worker (WebGPU First / WASM SIMD Fallback)\nLiveAction · OmniSR · RealESR-Anime · NAFNet"]
+        FaceWorker["faceSeg.worker (WASM)\nface-seg-multiclass Facial Skin Fitting"]
+        PencilWorker["pencilSketch.worker (WebGPU / WASM + LRU Cache)\npencil-lineart Neural Line Extraction"]
+    end
+
+    Web --> UI
+    Desktop --> UI
+    Stage <--> Sidebar
+    Sidebar <--> DB
+    Sidebar --> StyleWorker
+    Sidebar --> EnhanceWorker
+    Sidebar --> FaceWorker
+    Sidebar --> PencilWorker
+    EnhanceWorker -.->|"×2 Enhanced Base"| StyleWorker
+    FaceWorker -.->|"Face-Fit Mask"| StyleWorker
+    PencilWorker -.->|"Line-Art Tensor"| StyleWorker
+```
 
 ---
 
@@ -97,7 +141,7 @@ Pixel & Toon Studio includes 8 deeply tuned visual styles, layered with 6 global
 | **Duotone Poster** (`duotone`) | Minimalist two-tone screenprint with live shadow/highlight palette swatches | Shadow Hue (0–359°), Highlight Hue (0–359°), Tone Split, Detail Keep, Color Richness, Poster Contrast |
 | **Vintage Film** (`film`) | Analog fade curve, silver halide grain, soft diffusion, halation & vignette | Film Fade, Film Grain, Soft Diffusion, Warmth, Halation, Tint, Vignette |
 
-> 💡 **Tuning Tip**: All style, Smart Color, and global adjustment sliders update in real time. **Double-click any slider** to restore its default value.
+> 💡 **Tuning Tip**: Every style includes **3 quick preset pills** and **3 core sliders**, with remaining parameters tucked into a collapsible **Advanced Tuning** drawer. All style, Smart Color, and global adjustment sliders update in real time — **double-click any slider** to restore its default value.
 
 ---
 
@@ -158,20 +202,20 @@ Organized into 6 categories with a visual picker, category filter, and random sh
 
 ### 3. Native Camera EXIF Readout
 
-- Prompts for privacy consent before parsing camera model, shutter speed, aperture, ISO, and capture date, printing genuine photography specs onto the frame border.
+- Displays a non-blocking inline privacy consent card at the top of the sidebar before parsing camera model, shutter speed, aperture, ISO, and capture date, printing genuine photography specs onto the frame border.
 
 ---
 
 ## Thoughtful Workflow Features
 
-- 🌐 **Language Onboarding & Live Switching**: First-launch bilingual selector plus top-bar Preferences popover for instant switching between English and Simplified Chinese across all UI controls and native menus.
+- 🌐 **Inline Onboarding, Bilingual UI & Localized Errors**: Non-blocking inline language selector on first launch plus a top-bar Preferences popover for instant switching between English and Simplified Chinese across all UI controls, Worker progress/error messages, and native desktop menus.
 - 🎨 **Adaptive Themes & 6 Color Palettes**: System, Light, and Dark modes paired with 6 curated palettes (Sky Blue, Sakura Pink, Mint Forest, Sunset Amber, Lavender Aura, Midnight Indigo).
 - 🖥️ **Desktop & Web Integrations**: macOS frosted draggable title bar, Dock drop, and `Cmd` shortcuts; Windows native title bar, NSIS installer, standalone Portable `.exe`, multi-resolution `.ico`, Explorer "Open With", and `Ctrl` shortcuts.
 - 📱 **Wide Format Support**: Native **HEIC / HEIF** (iPhone/iPad), PNG, JPEG, and WebP up to 24 MP / 12,000 px via file picker, drag-and-drop, or clipboard paste (`Cmd/Ctrl + V`).
-- 📑 **Multi-Tab Workspace & Batch Sync**: Independent per-tab state and history, plus one-click *Sync Style to All Photos*.
-- 👁 **Instant Comparison**: Switch between *Full Effect*, *Split Compare*, and *Original*, or hold **Spacebar** anywhere to peek at the original photo.
-- ↶ **Undo/Redo & Local Persistence**: Full `Cmd/Ctrl + Z` / `Cmd/Ctrl + Shift + Z` history and automatic IndexedDB persistence.
-- 🛡 **Zero-Leak Privacy**: All computation stays on your CPU/GPU; exported PNGs automatically strip GPS and EXIF metadata.
+- 📑 **Multi-Tab Workspace, Dual Format & Batch Export**: Independent per-tab state and history; open *Select & Export* in the sidebar for Select All/Deselect All, click-to-preview, and batch export in **PNG (Lossless)** or **JPEG (Compact, 92% quality)**, with direct file/folder picking on Desktop and Chromium browsers.
+- 👁 **Instant Comparison, Cursor Zoom & Pan**: Switch between *Full Effect*, *Split Compare*, and *Original*; zoom (`100%–500%`) via toolbar buttons (`−` / `Fit` / `+`), cursor-anchored wheel, trackpad pinch, or two-finger touch pinch; drag to pan (or `Alt`+drag / middle-click while Mosaic Brush is active), double-click to reset, or hold **Spacebar** anywhere to peek at the original photo.
+- ↶ **Undo/Redo, Persistence & Recovery**: Full `Cmd/Ctrl + Z` / `Cmd/Ctrl + Shift + Z` history, automatic IndexedDB persistence, and a top-level React `ErrorBoundary` offering one-click recovery or reload without losing local photos.
+- 🛡 **Zero-Leak Privacy**: All computation stays on your CPU/GPU; exported PNGs and JPEGs automatically strip GPS and EXIF metadata.
 
 ---
 
@@ -190,10 +234,10 @@ npm install
 # 3. Launch local development server
 npm run dev
 
-# 4. Run typecheck, model integrity verification, and full unit test suite (23 suites, 154 tests)
+# 4. Run typecheck, model integrity verification, and full unit test suite (25 suites, 166 tests)
 npm run typecheck
 npm run verify:model
-npm run test:run
+npm run test:run -- --maxWorkers=1
 
 # 5. Build production bundle & preview locally
 npm run build

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, writeFile, mkdir, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { APP_ORIGIN, createAssetHandler, isAppUrl, pngPayload } from '../desktop/local-assets.mjs';
+import { APP_ORIGIN, createAssetHandler, imagePayload, isAppUrl, pngPayload } from '../desktop/local-assets.mjs';
 
 describe('desktop local origin', () => {
     it('serves bundled modules, model query URLs and WASM, but rejects traversal, symlinks and old APIs', async () => {
@@ -38,6 +38,12 @@ describe('desktop local origin', () => {
         const png = pngPayload(bytes, '../../test.png');
         expect(png.filename).toBe('.._.._test.png');
         expect(png.data.length).toBe(30);
+
+        const jpgBytes = new Uint8Array(30);
+        jpgBytes.set([0xff, 0xd8, 0xff, 0xe0]);
+        const jpg = imagePayload(jpgBytes, '../../photo.png', 'jpeg');
+        expect(jpg.filename).toBe('.._.._photo.jpg');
+        expect(() => imagePayload(bytes, 'wrong.jpg', 'jpeg')).toThrow();
     });
 
     it('includes valid macOS (.icns) and Windows (.ico) desktop icons and cross-platform builder config', async () => {

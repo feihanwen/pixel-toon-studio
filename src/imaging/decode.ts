@@ -67,5 +67,9 @@ export async function decode(blob: Blob) {
     return bitmap;
 }
 export function toImageData(bitmap: ImageBitmap, maxSide = PREVIEW_SIDE) { const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height)), width = Math.max(1, Math.round(bitmap.width * scale)), height = Math.max(1, Math.round(bitmap.height * scale)); const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d', { willReadFrequently: true }); if (!ctx)
-    throw new Error('浏览器无法创建图片画布'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height); ctx.drawImage(bitmap, 0, 0, width, height); return ctx.getImageData(0, 0, width, height); }
+    throw new Error(
+        getLanguage() === 'en'
+            ? 'Browser could not create an image canvas'
+            : '浏览器无法创建图片画布',
+    ); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height); ctx.drawImage(bitmap, 0, 0, width, height); return ctx.getImageData(0, 0, width, height); }
 export function imageDataCanvas(data: ImageData) { const canvas = document.createElement('canvas'); canvas.width = data.width; canvas.height = data.height; canvas.getContext('2d')?.putImageData(data, 0, 0); return canvas; }

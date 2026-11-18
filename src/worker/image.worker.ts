@@ -1,3 +1,4 @@
+import { bMsg } from '../config/errors';
 import type { RenderRequest, WorkerResponse } from '../types/worker';
 import { render } from './pipeline';
 self.onmessage = (event: MessageEvent<RenderRequest>) => { const req = event.data; try {
@@ -6,6 +7,12 @@ self.onmessage = (event: MessageEvent<RenderRequest>) => { const req = event.dat
     self.postMessage(result, { transfer: [buffer] });
 }
 catch (error) {
-    const result: WorkerResponse = { kind: 'error', id: req.id, tabId: req.tabId, revision: req.revision, message: error instanceof Error ? error.message : '图像处理失败' };
+    const result: WorkerResponse = {
+        kind: 'error',
+        id: req.id,
+        tabId: req.tabId,
+        revision: req.revision,
+        message: error instanceof Error ? error.message : bMsg(req.language, '图像处理失败', 'Image processing failed'),
+    };
     self.postMessage(result);
 } };

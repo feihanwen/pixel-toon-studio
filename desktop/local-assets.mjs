@@ -33,10 +33,27 @@ export function createAssetHandler(root) {
     };
 }
 
-export function pngPayload(bytes, name) {
-    if (!(bytes instanceof Uint8Array) || bytes.byteLength < 24 || bytes.byteLength > 256 * 1024 * 1024) throw new Error('PNG 文件大小无效');
+export function imagePayload(bytes, name, format = 'png') {
+    const ext = format === 'jpeg' ? 'jpg' : 'png';
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength < 24 || bytes.byteLength > 256 * 1024 * 1024) {
+        throw new Error('图片文件大小无效');
+    }
     const data = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (!data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('只能保存 PNG 图片');
-    const base = String(name ?? 'image').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/\.png$/i, '').slice(0, 150) || 'image';
-    return { data, filename: `${base}.png` };
+    if (ext === 'png') {
+        if (!data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+            throw new Error('只能保存 PNG 图片');
+        }
+    } else if (!(data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff)) {
+        throw new Error('只能保存 JPEG 图片');
+    }
+    const base =
+        String(name ?? 'image')
+            .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
+            .replace(/\.(?:png|jpe?g)$/i, '')
+            .slice(0, 150) || 'image';
+    return { data, filename: `${base}.${ext}` };
+}
+
+export function pngPayload(bytes, name) {
+    return imagePayload(bytes, name, 'png');
 }
